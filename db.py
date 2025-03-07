@@ -7,20 +7,20 @@ def init_db():
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     
-    # Users table: stores user info, language, points, referrals, and banned status.
+    # Users table (language removed)
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id TEXT PRIMARY KEY,
             username TEXT,
             join_date TEXT,
-            language TEXT DEFAULT 'English',
             points INTEGER DEFAULT 0,
             referrals INTEGER DEFAULT 0,
-            banned INTEGER DEFAULT 0
+            banned INTEGER DEFAULT 0,
+            pending_referrer TEXT
         )
     ''')
     
-    # Referrals table: tracks which user referred which.
+    # Referrals table
     c.execute('''
         CREATE TABLE IF NOT EXISTS referrals (
             user_id TEXT,
@@ -29,7 +29,7 @@ def init_db():
         )
     ''')
     
-    # Platforms table: stores platform name and its stock (stored as a JSON string).
+    # Platforms table: stores platform name and stock (as JSON)
     c.execute('''
         CREATE TABLE IF NOT EXISTS platforms (
             platform_name TEXT PRIMARY KEY,
@@ -37,7 +37,7 @@ def init_db():
         )
     ''')
     
-    # Reviews table: for user reviews and suggestions.
+    # Reviews table for user feedback
     c.execute('''
         CREATE TABLE IF NOT EXISTS reviews (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +47,7 @@ def init_db():
         )
     ''')
     
-    # Admin logs table: logs actions taken by admins.
+    # Admin logs table
     c.execute('''
         CREATE TABLE IF NOT EXISTS admin_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,7 +57,7 @@ def init_db():
         )
     ''')
     
-    # Channels table: for storing channel links used in verification.
+    # Channels table for verification
     c.execute('''
         CREATE TABLE IF NOT EXISTS channels (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,7 +65,7 @@ def init_db():
         )
     ''')
     
-    # Admins table: stores admin user IDs, roles, and banned status.
+    # Admins table
     c.execute('''
         CREATE TABLE IF NOT EXISTS admins (
             user_id TEXT PRIMARY KEY,
@@ -75,7 +75,7 @@ def init_db():
         )
     ''')
     
-    # Keys table: for key generation system (normal and premium keys).
+    # Keys table for key generation system
     c.execute('''
         CREATE TABLE IF NOT EXISTS keys (
             key TEXT PRIMARY KEY,
@@ -90,7 +90,50 @@ def init_db():
     conn.commit()
     conn.close()
 
+def add_user(user_id, username, join_date, pending_referrer=None):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("INSERT OR IGNORE INTO users (user_id, username, join_date, pending_referrer) VALUES (?, ?, ?, ?)",
+              (user_id, username, join_date, pending_referrer))
+    conn.commit()
+    conn.close()
+
+def get_user(user_id):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
+    user = c.fetchone()
+    conn.close()
+    return user
+
+def update_user_pending_referral(user_id, pending_referrer):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("UPDATE users SET pending_referrer=? WHERE user_id=?", (pending_referrer, user_id))
+    conn.commit()
+    conn.close()
+
+def clear_pending_referral(user_id):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("UPDATE users SET pending_referrer=NULL WHERE user_id=?", (user_id,))
+    conn.commit()
+    conn.close()
+
+def add_referral(referrer_id, referred_id):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    # Only record if this referred_id is not already recorded
+    c.execute("SELECT * FROM referrals WHERE referred_id=?", (referred_id,))
+    if c.fetchone():
+        conn.close()
+        return
+    c.execute("INSERT INTO referrals (user_id, referred_id) VALUES (?, ?)", (referrer_id, referred_id))
+    # Award 4 points and increment referral count for the referrer
+    c.execute("UPDATE users SET points = points + 4, referrals = referrals + 1 WHERE user_id=?", (referrer_id,))
+    conn.commit()
+    conn.close()
+
 if __name__ == '__main__':
     init_db()
     print("Database initialized.")
-  
