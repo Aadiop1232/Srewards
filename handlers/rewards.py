@@ -75,3 +75,4 @@ def claim_account(bot, call, platform):
     update_stock_for_platform(platform, stock)
     bot.answer_callback_query(call.id, "🎉 Account claimed!")
     bot.send_message(call.message.chat.id, f"💳 *Your account for {platform}:*\n`{account}`", parse_mode="Markdown")
+        
