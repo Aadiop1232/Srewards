@@ -11,7 +11,6 @@ def process_review(message):
     review_text = message.text
     add_review(str(message.from_user.id), review_text)
     bot = telebot.TeleBot(config.TOKEN)
-    # Forward review to all owners
     for owner in config.OWNERS:
         try:
             bot.send_message(owner,
