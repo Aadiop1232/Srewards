@@ -7,27 +7,30 @@ from handlers.admin import is_admin
 def check_channel_membership(bot, user_id):
     """
     Checks if the user is a member of all required channels.
-    If an error is raised stating "member list is inaccessible," we skip that channel's check.
+    For each channel, first verify that the bot is an administrator.
+    Returns True only if the bot is admin in the channel and the user is a member.
     """
     for channel in config.REQUIRED_CHANNELS:
         try:
             channel_username = channel.rstrip('/').split("/")[-1]
-            # Call get_chat_member directly using "@" + username.
-            member = bot.get_chat_member("@" + channel_username, user_id)
-            if member.status not in ["member", "creator", "administrator"]:
+            chat = bot.get_chat("@" + channel_username)
+            # Check bot privileges in channel
+            bot_member = bot.get_chat_member(chat.id, bot.get_me().id)
+            if bot_member.status not in ["administrator", "creator"]:
+                print(f"Bot is not admin in {channel}")
+                return False
+            user_member = bot.get_chat_member(chat.id, user_id)
+            if user_member.status not in ["member", "creator", "administrator"]:
                 return False
         except Exception as e:
-            err = str(e).lower()
-            if "inaccessible" in err:
-                # If the error indicates that the member list is inaccessible, assume verification passes.
-                continue
             print(f"❌ Error checking membership for {channel}: {e}")
             return False
     return True
 
 def send_verification_message(bot, message):
     """
-    Auto‑verifies owners/admins; otherwise, sends channel join buttons with a Verify button.
+    If the user is an admin/owner, auto‑verify.
+    Otherwise, send a message with channel join buttons and a Verify button.
     """
     user_id = message.from_user.id
 
@@ -53,7 +56,7 @@ def send_verification_message(bot, message):
 
 def handle_verification_callback(bot, call):
     """
-    Re-checks channel membership on Verify button click.
+    When the user clicks the "✅ Verify" button, re-check channel membership.
     """
     user_id = call.from_user.id
     if check_channel_membership(bot, user_id):
