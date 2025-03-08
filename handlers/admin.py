@@ -14,8 +14,7 @@ def add_platform(platform_name):
     conn = get_db_connection()
     c = conn.cursor()
     try:
-        c.execute("INSERT INTO platforms (platform_name, stock) VALUES (?, ?)", 
-                  (platform_name, json.dumps([])))
+        c.execute("INSERT INTO platforms (platform_name, stock) VALUES (?, ?)", (platform_name, json.dumps([])))
         conn.commit()
     except Exception as e:
         conn.close()
@@ -146,8 +145,7 @@ def generate_premium_key():
 def add_key(key, key_type, points):
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("INSERT INTO keys (key, type, points, claimed) VALUES (?, ?, ?, 0)", 
-              (key, key_type, points))
+    c.execute("INSERT INTO keys (key, type, points, claimed) VALUES (?, ?, ?, 0)", (key, key_type, points))
     conn.commit()
     conn.close()
 
@@ -160,48 +158,48 @@ def get_keys():
     return rows
 
 # --- Admin Panel Handlers ---
-
 def is_admin(user_id):
-    # Check if user is in the OWNERS list (multiple owners supported)
-    if str(user_id) in [str(x) for x in config.OWNERS]:
+    uid = str(user_id)
+    # Check if user is in the OWNERS list
+    if uid in config.OWNERS:
         return True
     # Otherwise, check the admins table
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM admins WHERE user_id=? AND banned=0", (str(user_id),))
+    c.execute("SELECT * FROM admins WHERE user_id=? AND banned=0", (uid,))
     row = c.fetchone()
     conn.close()
     return row is not None
 
 def send_admin_menu(bot, message):
     if not is_admin(message.from_user.id):
-        bot.send_message(message.chat.id, "Access prohibited.")
+        bot.send_message(message.chat.id, "🚫 *Access prohibited!*", parse_mode="Markdown")
         return
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton("Platform Mgmt", callback_data="admin_platform"),
-        types.InlineKeyboardButton("Stock Mgmt", callback_data="admin_stock"),
-        types.InlineKeyboardButton("Channel Mgmt", callback_data="admin_channel"),
-        types.InlineKeyboardButton("Admin Mgmt", callback_data="admin_manage"),
-        types.InlineKeyboardButton("User Mgmt", callback_data="admin_users"),
-        types.InlineKeyboardButton("Key Generation", callback_data="admin_keys")
+        types.InlineKeyboardButton("📺 Platform Mgmt", callback_data="admin_platform"),
+        types.InlineKeyboardButton("📈 Stock Mgmt", callback_data="admin_stock"),
+        types.InlineKeyboardButton("🔗 Channel Mgmt", callback_data="admin_channel"),
+        types.InlineKeyboardButton("👥 Admin Mgmt", callback_data="admin_manage"),
+        types.InlineKeyboardButton("👤 User Mgmt", callback_data="admin_users"),
+        types.InlineKeyboardButton("🔑 Key Gen", callback_data="admin_keys")
     )
-    markup.add(types.InlineKeyboardButton("Back", callback_data="admin_back"))
-    bot.send_message(message.chat.id, "Admin Panel", reply_markup=markup)
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_back"))
+    bot.send_message(message.chat.id, "🛠 *Admin Panel* 🛠", parse_mode="Markdown", reply_markup=markup)
 
 # --- PLATFORM MANAGEMENT HANDLERS ---
 def handle_admin_platform(bot, call):
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton("Add Platform", callback_data="admin_platform_add"),
-        types.InlineKeyboardButton("Remove Platform", callback_data="admin_platform_remove")
+        types.InlineKeyboardButton("➕ Add Platform", callback_data="admin_platform_add"),
+        types.InlineKeyboardButton("➖ Remove Platform", callback_data="admin_platform_remove")
     )
-    markup.add(types.InlineKeyboardButton("Back", callback_data="admin_back"))
-    bot.edit_message_text("Platform Management:", chat_id=call.message.chat.id,
-                            message_id=call.message.message_id, reply_markup=markup)
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_back"))
+    bot.edit_message_text("📺 *Platform Management* 📺", chat_id=call.message.chat.id,
+                            message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
 def handle_admin_platform_add(bot, call):
-    msg = bot.send_message(call.message.chat.id, "Send the platform name to add:")
+    msg = bot.send_message(call.message.chat.id, "✏️ *Send the platform name to add:*", parse_mode="Markdown")
     bot.register_next_step_handler(msg, process_platform_add)
 
 def process_platform_add(message):
@@ -209,44 +207,44 @@ def process_platform_add(message):
     error = add_platform(platform_name)
     bot = telebot.TeleBot(config.TOKEN)
     if error:
-        response = f"Error adding platform: {error}"
+        response = f"❌ Error adding platform: {error}"
     else:
-        response = f"Platform '{platform_name}' added successfully."
-    bot.send_message(message.chat.id, response)
+        response = f"✅ Platform *{platform_name}* added successfully!"
+    bot.send_message(message.chat.id, response, parse_mode="Markdown")
     send_admin_menu(bot, message)
 
 def handle_admin_platform_remove(bot, call):
     platforms = get_platforms()
     if not platforms:
-        bot.answer_callback_query(call.id, "No platforms to remove.")
+        bot.answer_callback_query(call.id, "😕 No platforms to remove.")
         return
     markup = types.InlineKeyboardMarkup(row_width=2)
     for plat in platforms:
         markup.add(types.InlineKeyboardButton(plat, callback_data=f"admin_platform_rm_{plat}"))
-    markup.add(types.InlineKeyboardButton("Back", callback_data="admin_platform"))
-    bot.edit_message_text("Select a platform to remove:", chat_id=call.message.chat.id,
-                            message_id=call.message.message_id, reply_markup=markup)
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_platform"))
+    bot.edit_message_text("📺 *Select a platform to remove:*", chat_id=call.message.chat.id,
+                            message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
 def handle_admin_platform_rm(bot, call, platform):
     remove_platform(platform)
-    bot.answer_callback_query(call.id, f"Platform '{platform}' removed.")
+    bot.answer_callback_query(call.id, f"✅ Platform *{platform}* removed.")
     handle_admin_platform(bot, call)
 
 # --- STOCK MANAGEMENT HANDLERS ---
 def handle_admin_stock(bot, call):
     platforms = get_platforms()
     if not platforms:
-        bot.answer_callback_query(call.id, "No platforms available. Add one first.")
+        bot.answer_callback_query(call.id, "😕 No platforms available. Add one first.")
         return
     markup = types.InlineKeyboardMarkup(row_width=2)
     for plat in platforms:
         markup.add(types.InlineKeyboardButton(plat, callback_data=f"admin_stock_{plat}"))
-    markup.add(types.InlineKeyboardButton("Back", callback_data="admin_back"))
-    bot.edit_message_text("Select a platform to add stock:", chat_id=call.message.chat.id,
-                            message_id=call.message.message_id, reply_markup=markup)
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_back"))
+    bot.edit_message_text("📈 *Select a platform to add stock:*", chat_id=call.message.chat.id,
+                            message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
 def handle_admin_stock_platform(bot, call, platform):
-    msg = bot.send_message(call.message.chat.id, f"Send the stock text (accounts separated by newlines) for platform '{platform}':")
+    msg = bot.send_message(call.message.chat.id, f"✏️ *Send the stock text for platform {platform}:*\n(Each account on a new line)", parse_mode="Markdown")
     bot.register_next_step_handler(msg, process_stock_upload, platform)
 
 def process_stock_upload(message, platform):
@@ -254,22 +252,22 @@ def process_stock_upload(message, platform):
     accounts = data.splitlines()
     add_stock_to_platform(platform, accounts)
     bot = telebot.TeleBot(config.TOKEN)
-    bot.send_message(message.chat.id, f"Stock for platform '{platform}' updated with {len(accounts)} accounts.")
+    bot.send_message(message.chat.id, f"✅ Stock for *{platform}* updated with {len(accounts)} accounts.", parse_mode="Markdown")
     send_admin_menu(bot, message)
 
 # --- CHANNEL MANAGEMENT HANDLERS ---
 def handle_admin_channel(bot, call):
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton("Add Channel", callback_data="admin_channel_add"),
-        types.InlineKeyboardButton("Remove Channel", callback_data="admin_channel_remove")
+        types.InlineKeyboardButton("➕ Add Channel", callback_data="admin_channel_add"),
+        types.InlineKeyboardButton("➖ Remove Channel", callback_data="admin_channel_remove")
     )
-    markup.add(types.InlineKeyboardButton("Back", callback_data="admin_back"))
-    bot.edit_message_text("Channel Management:", chat_id=call.message.chat.id,
-                            message_id=call.message.message_id, reply_markup=markup)
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_back"))
+    bot.edit_message_text("🔗 *Channel Management* 🔗", chat_id=call.message.chat.id,
+                            message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
 def handle_admin_channel_add(bot, call):
-    msg = bot.send_message(call.message.chat.id, "Send the channel link to add:")
+    msg = bot.send_message(call.message.chat.id, "✏️ *Send the channel link to add:*", parse_mode="Markdown")
     bot.register_next_step_handler(msg, process_channel_add)
 
 def process_channel_add(message):
@@ -280,59 +278,60 @@ def process_channel_add(message):
         c.execute("INSERT INTO channels (channel_link) VALUES (?)", (channel_link,))
         conn.commit()
         conn.close()
-        response = f"Channel '{channel_link}' added successfully."
+        response = f"✅ Channel *{channel_link}* added successfully."
     except Exception as e:
-        response = f"Error adding channel: {e}"
+        response = f"❌ Error adding channel: {e}"
     bot = telebot.TeleBot(config.TOKEN)
-    bot.send_message(message.chat.id, response)
+    bot.send_message(message.chat.id, response, parse_mode="Markdown")
     send_admin_menu(bot, message)
 
 def handle_admin_channel_remove(bot, call):
     channels = get_channels()
     if not channels:
-        bot.answer_callback_query(call.id, "No channels to remove.")
+        bot.answer_callback_query(call.id, "😕 No channels to remove.")
         return
     markup = types.InlineKeyboardMarkup(row_width=1)
     for cid, link in channels:
         markup.add(types.InlineKeyboardButton(link, callback_data=f"admin_channel_rm_{cid}"))
-    markup.add(types.InlineKeyboardButton("Back", callback_data="admin_channel"))
-    bot.edit_message_text("Select a channel to remove:", chat_id=call.message.chat.id,
-                            message_id=call.message.message_id, reply_markup=markup)
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_channel"))
+    bot.edit_message_text("🔗 *Select a channel to remove:*", chat_id=call.message.chat.id,
+                            message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
 def handle_admin_channel_rm(bot, call, channel_id):
     remove_channel(channel_id)
-    bot.answer_callback_query(call.id, "Channel removed.")
+    bot.answer_callback_query(call.id, "✅ Channel removed.")
     handle_admin_channel(bot, call)
 
-# --- ADMIN MANAGEMENT HANDLERS (For Owners Only) ---
+# --- ADMIN MANAGEMENT (For Owners Only) ---
 def handle_admin_manage(bot, call):
     if str(call.from_user.id) not in [str(x) for x in config.OWNERS]:
-        bot.answer_callback_query(call.id, "Access prohibited.")
+        bot.answer_callback_query(call.id, "🚫 Access prohibited.")
         return
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton("Admin List", callback_data="admin_list"),
-        types.InlineKeyboardButton("Ban/Unban Admin", callback_data="admin_ban_unban"),
-        types.InlineKeyboardButton("Remove Admin", callback_data="admin_remove"),
-        types.InlineKeyboardButton("Add Owner", callback_data="admin_add_owner"),
-        types.InlineKeyboardButton("Admin Logs", callback_data="admin_logs")
+        types.InlineKeyboardButton("👥 Admin List", callback_data="admin_list"),
+        types.InlineKeyboardButton("🚫 Ban/Unban Admin", callback_data="admin_ban_unban"),
+        types.InlineKeyboardButton("❌ Remove Admin", callback_data="admin_remove"),
+        types.InlineKeyboardButton("👑 Add Owner", callback_data="admin_add_owner"),
+        types.InlineKeyboardButton("📝 Admin Logs", callback_data="admin_logs")
     )
-    markup.add(types.InlineKeyboardButton("Back", callback_data="admin_back"))
-    bot.edit_message_text("Admin Management:", chat_id=call.message.chat.id,
-                            message_id=call.message.message_id, reply_markup=markup)
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_back"))
+    bot.edit_message_text("👥 *Admin Management* 👥", chat_id=call.message.chat.id,
+                            message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
 def handle_admin_list(bot, call):
     admins = get_admins()
     if not admins:
-        text = "No admins found."
+        text = "😕 No admins found."
     else:
-        text = "Admins:\n"
+        text = "👥 *Admins:*\n"
         for admin in admins:
-            text += f"UserID: {admin[0]}, Username: {admin[1]}, Role: {admin[2]}, Banned: {admin[3]}\n"
-    bot.edit_message_text(text, chat_id=call.message.chat.id, message_id=call.message.message_id)
+            text += f"• *UserID:* {admin[0]}, *Username:* {admin[1]}, *Role:* {admin[2]}, *Banned:* {admin[3]}\n"
+    bot.edit_message_text(text, chat_id=call.message.chat.id,
+                            message_id=call.message.message_id, parse_mode="Markdown")
 
 def handle_admin_ban_unban(bot, call):
-    msg = bot.send_message(call.message.chat.id, "Send the admin UserID to ban/unban:")
+    msg = bot.send_message(call.message.chat.id, "✏️ *Send the admin UserID to ban/unban:*", parse_mode="Markdown")
     bot.register_next_step_handler(msg, process_admin_ban_unban)
 
 def process_admin_ban_unban(message):
@@ -342,42 +341,42 @@ def process_admin_ban_unban(message):
     c.execute("SELECT banned FROM admins WHERE user_id=?", (user_id,))
     row = c.fetchone()
     if row is None:
-        response = "Admin not found."
+        response = "❌ Admin not found."
     else:
         if row[0] == 0:
             ban_admin(user_id)
-            response = f"Admin {user_id} has been banned."
+            response = f"🚫 Admin {user_id} has been banned."
         else:
             unban_admin(user_id)
-            response = f"Admin {user_id} has been unbanned."
+            response = f"✅ Admin {user_id} has been unbanned."
     conn.close()
     bot = telebot.TeleBot(config.TOKEN)
-    bot.send_message(message.chat.id, response)
+    bot.send_message(message.chat.id, response, parse_mode="Markdown")
     send_admin_menu(bot, message)
 
 def handle_admin_remove(bot, call):
-    msg = bot.send_message(call.message.chat.id, "Send the admin UserID to remove:")
+    msg = bot.send_message(call.message.chat.id, "✏️ *Send the admin UserID to remove:*", parse_mode="Markdown")
     bot.register_next_step_handler(msg, process_admin_remove)
 
 def process_admin_remove(message):
     user_id = message.text.strip()
     remove_admin(user_id)
-    response = f"Admin {user_id} removed."
+    response = f"✅ Admin {user_id} removed."
     bot = telebot.TeleBot(config.TOKEN)
-    bot.send_message(message.chat.id, response)
+    bot.send_message(message.chat.id, response, parse_mode="Markdown")
     send_admin_menu(bot, message)
 
 def handle_admin_add_owner(bot, call):
-    msg = bot.send_message(call.message.chat.id, "Send the UserID to add as owner:")
+    msg = bot.send_message(call.message.chat.id, "✏️ *Send the UserID to add as owner:*", parse_mode="Markdown")
     bot.register_next_step_handler(msg, process_admin_add_owner)
 
 def process_admin_add_owner(message):
     user_id = message.text.strip()
     username = message.from_user.username or message.from_user.first_name
     add_admin(user_id, username, role="owner")
-    response = f"User {user_id} added as owner."
+    response = f"👑 User {user_id} added as owner."
     bot = telebot.TeleBot(config.TOKEN)
-    bot.send_message(message.chat.id, response)
+    bot.send_message(message.chat.id, response, parse_mode="Markdown")
     send_admin_menu(bot, message)
 
 def handle_admin_logs(bot, call):
@@ -387,30 +386,31 @@ def handle_admin_logs(bot, call):
     rows = c.fetchall()
     conn.close()
     if not rows:
-        text = "No admin logs available."
+        text = "😕 No admin logs available."
     else:
-        text = "Admin Logs:\n"
+        text = "📝 *Admin Logs:*\n"
         for row in rows:
-            text += f"{row[2]} by {row[1]} at {row[3]}\n"
-    bot.edit_message_text(text, chat_id=call.message.chat.id, message_id=call.message.message_id)
+            text += f"• {row[2]} by {row[1]} at {row[3]}\n"
+    bot.edit_message_text(text, chat_id=call.message.chat.id,
+                            message_id=call.message.message_id, parse_mode="Markdown")
 
 # --- USER MANAGEMENT HANDLERS ---
 def handle_admin_users(bot, call):
     users = get_users()
     if not users:
-        text = "No users found."
+        text = "😕 No users found."
     else:
-        text = "Users:\n"
+        text = "👤 *Users:*\n"
         for user in users:
-            text += f"UserID: {user[0]}, Username: {user[1]}, Banned: {user[2]}\n"
+            text += f"• *UserID:* {user[0]}, *Username:* {user[1]}, *Banned:* {user[2]}\n"
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("Ban/Unban User", callback_data="user_ban_unban"))
-    markup.add(types.InlineKeyboardButton("Back", callback_data="admin_back"))
+    markup.add(types.InlineKeyboardButton("🚫 Ban/Unban User", callback_data="user_ban_unban"))
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_back"))
     bot.edit_message_text(text, chat_id=call.message.chat.id,
-                            message_id=call.message.message_id, reply_markup=markup)
+                            message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
 def handle_user_ban_unban(bot, call):
-    msg = bot.send_message(call.message.chat.id, "Send the UserID to ban/unban:")
+    msg = bot.send_message(call.message.chat.id, "✏️ *Send the UserID to ban/unban:*", parse_mode="Markdown")
     bot.register_next_step_handler(msg, process_user_ban_unban)
 
 def process_user_ban_unban(message):
@@ -420,33 +420,33 @@ def process_user_ban_unban(message):
     c.execute("SELECT banned FROM users WHERE user_id=?", (user_id,))
     row = c.fetchone()
     if row is None:
-        response = "User not found."
+        response = "❌ User not found."
     else:
         if row[0] == 0:
             ban_user(user_id)
-            response = f"User {user_id} has been banned."
+            response = f"🚫 User {user_id} has been banned."
         else:
             unban_user(user_id)
-            response = f"User {user_id} has been unbanned."
+            response = f"✅ User {user_id} has been unbanned."
     conn.close()
     bot = telebot.TeleBot(config.TOKEN)
-    bot.send_message(message.chat.id, response)
+    bot.send_message(message.chat.id, response, parse_mode="Markdown")
     send_admin_menu(bot, message)
 
 # --- KEYS GENERATION HANDLERS ---
 def handle_admin_keys(bot, call):
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton("Generate Normal Keys", callback_data="gen_normal_keys"),
-        types.InlineKeyboardButton("Generate Premium Keys", callback_data="gen_premium_keys")
+        types.InlineKeyboardButton("🔑 Generate Normal Keys", callback_data="gen_normal_keys"),
+        types.InlineKeyboardButton("🔑 Generate Premium Keys", callback_data="gen_premium_keys")
     )
-    markup.add(types.InlineKeyboardButton("View Keys", callback_data="view_keys"))
-    markup.add(types.InlineKeyboardButton("Back", callback_data="admin_back"))
-    bot.edit_message_text("Key Generation System:", chat_id=call.message.chat.id,
-                            message_id=call.message.message_id, reply_markup=markup)
+    markup.add(types.InlineKeyboardButton("👀 View Keys", callback_data="view_keys"))
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_back"))
+    bot.edit_message_text("🔑 *Key Generation System* 🔑", chat_id=call.message.chat.id,
+                            message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
 def handle_gen_normal_keys(bot, call):
-    msg = bot.send_message(call.message.chat.id, "Enter quantity of normal keys to generate:")
+    msg = bot.send_message(call.message.chat.id, "✏️ *Enter quantity of normal keys to generate:*", parse_mode="Markdown")
     bot.register_next_step_handler(msg, process_gen_normal_keys)
 
 def process_gen_normal_keys(message):
@@ -459,13 +459,13 @@ def process_gen_normal_keys(message):
         key = generate_normal_key()
         add_key(key, "normal", 15)
         generated.append(key)
-    response = "Normal Keys Generated:\n" + "\n".join(generated)
+    response = "✅ *Normal Keys Generated:*\n" + "\n".join(generated)
     bot = telebot.TeleBot(config.TOKEN)
-    bot.send_message(message.chat.id, response)
+    bot.send_message(message.chat.id, response, parse_mode="Markdown")
     send_admin_menu(bot, message)
 
 def handle_gen_premium_keys(bot, call):
-    msg = bot.send_message(call.message.chat.id, "Enter quantity of premium keys to generate:")
+    msg = bot.send_message(call.message.chat.id, "✏️ *Enter quantity of premium keys to generate:*", parse_mode="Markdown")
     bot.register_next_step_handler(msg, process_gen_premium_keys)
 
 def process_gen_premium_keys(message):
@@ -478,21 +478,21 @@ def process_gen_premium_keys(message):
         key = generate_premium_key()
         add_key(key, "premium", 35)
         generated.append(key)
-    response = "Premium Keys Generated:\n" + "\n".join(generated)
+    response = "✅ *Premium Keys Generated:*\n" + "\n".join(generated)
     bot = telebot.TeleBot(config.TOKEN)
-    bot.send_message(message.chat.id, response)
+    bot.send_message(message.chat.id, response, parse_mode="Markdown")
     send_admin_menu(bot, message)
 
 def handle_view_keys(bot, call):
     keys = get_keys()
     if not keys:
-        text = "No keys generated."
+        text = "😕 No keys generated."
     else:
-        text = "Keys:\n"
+        text = "🔑 *Keys:*\n"
         for k in keys:
-            text += f"{k[0]} | {k[1]} | Points: {k[2]} | Claimed: {k[3]} | By: {k[4]}\n"
+            text += f"• {k[0]} | {k[1]} | Points: {k[2]} | Claimed: {k[3]} | By: {k[4]}\n"
     bot.edit_message_text(text, chat_id=call.message.chat.id,
-                            message_id=call.message.message_id)
+                            message_id=call.message.message_id, parse_mode="Markdown")
 
 # --- Callback Router ---
 def admin_callback_handler(bot, call):
