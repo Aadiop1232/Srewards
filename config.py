@@ -1,7 +1,7 @@
 # config.py
-TOKEN = "7973439072:AAEptM0ocO_bD_boLffKySQvI_p2Ta6t-AY"
+TOKEN = "7760154469:AAHlYx4gtIGDCWWv-ahrj4yrLm_cPGNgmHs"
 OWNER_ID = 7218606355  # Replace with your Telegram numeric owner ID
-BOT_USERNAME = "ShadowSqaudChkBot"  # Without '@'
+BOT_USERNAME = "ShadowRewardsBot"  # Without '@'
 REQUIRED_CHANNELS = [
     "https://t.me/shadowsquad0",
     "https://t.me/Originlabs",
