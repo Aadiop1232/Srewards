@@ -10,10 +10,13 @@ def prompt_review(bot, message):
 def process_review(message):
     review_text = message.text
     add_review(str(message.from_user.id), review_text)
-    # Forward review to owner
-    import telebot
     bot = telebot.TeleBot(config.TOKEN)
-    bot.send_message(config.OWNER_ID,
-                     f"Review from {message.from_user.username or message.from_user.first_name}:\n{review_text}")
+    # Forward review to all owners listed in config.OWNERS
+    for owner in config.OWNERS:
+        try:
+            bot.send_message(owner,
+                             f"Review from {message.from_user.username or message.from_user.first_name}:\n{review_text}")
+        except Exception as e:
+            print(f"Error sending review to owner {owner}: {e}")
     bot.send_message(message.chat.id, "Thank you for your feedback!")
-  
+    
