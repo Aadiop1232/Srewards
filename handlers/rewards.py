@@ -41,37 +41,37 @@ def send_rewards_menu(bot, message):
     platforms = get_platforms()
     markup = types.InlineKeyboardMarkup(row_width=2)
     if not platforms:
-        bot.send_message(message.chat.id, "No platforms available at the moment.")
+        bot.send_message(message.chat.id, "😢 No platforms available at the moment.")
         return
     for platform in platforms:
-        markup.add(types.InlineKeyboardButton(platform, callback_data=f"reward_{platform}"))
-    markup.add(types.InlineKeyboardButton("Back", callback_data="back_main"))
+        markup.add(types.InlineKeyboardButton(f"📺 {platform}", callback_data=f"reward_{platform}"))
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
     try:
-        bot.edit_message_text("Available Platforms:", chat_id=message.chat.id,
-                              message_id=message.message_id, reply_markup=markup)
+        bot.edit_message_text("🎯 *Available Platforms* 🎯", chat_id=message.chat.id,
+                              message_id=message.message_id, parse_mode="Markdown", reply_markup=markup)
     except Exception:
-        bot.send_message(message.chat.id, "Available Platforms:", reply_markup=markup)
+        bot.send_message(message.chat.id, "🎯 *Available Platforms* 🎯", parse_mode="Markdown", reply_markup=markup)
 
 def handle_platform_selection(bot, call, platform):
     stock = get_stock_for_platform(platform)
     if stock:
-        text = f"Platform: {platform}\nStock: {len(stock)} accounts available."
+        text = f"📺 *{platform}*:\n✅ *{len(stock)} accounts available!*"
         markup = types.InlineKeyboardMarkup(row_width=1)
-        markup.add(types.InlineKeyboardButton("Claim Account", callback_data=f"claim_{platform}"))
+        markup.add(types.InlineKeyboardButton("🎁 Claim Account", callback_data=f"claim_{platform}"))
     else:
-        text = f"Platform: {platform}\nNo accounts available at the moment."
+        text = f"📺 *{platform}*:\n😞 No accounts available at the moment."
         markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("Back", callback_data="menu_rewards"))
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="menu_rewards"))
     bot.edit_message_text(text, chat_id=call.message.chat.id,
-                          message_id=call.message.message_id, reply_markup=markup)
+                          message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
 def claim_account(bot, call, platform):
     stock = get_stock_for_platform(platform)
     if not stock:
-        bot.answer_callback_query(call.id, "No accounts available.")
+        bot.answer_callback_query(call.id, "😞 No accounts available.")
         return
-    index = random.randint(0, len(stock)-1)
+    index = random.randint(0, len(stock) - 1)
     account = stock.pop(index)
     update_stock_for_platform(platform, stock)
-    bot.answer_callback_query(call.id, f"Account claimed: {account}")
-    bot.send_message(call.message.chat.id, f"Your account for {platform}:\n{account}")
+    bot.answer_callback_query(call.id, f"🎉 Account claimed!")
+    bot.send_message(call.message.chat.id, f"💳 *Your account for {platform}:*\n`{account}`", parse_mode="Markdown")
