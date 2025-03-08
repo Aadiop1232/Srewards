@@ -141,6 +141,16 @@ def add_review(user_id, review):
     conn.commit()
     conn.close()
 
+def log_admin_action(admin_id, action):
+    """
+    Logs an admin action in the admin_logs table.
+    """
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("INSERT INTO admin_logs (admin_id, action) VALUES (?, ?)", (admin_id, action))
+    conn.commit()
+    conn.close()
+
 if __name__ == '__main__':
     init_db()
     print("Database initialized.")
