@@ -17,8 +17,8 @@ def extract_referral_code(message):
 
 def process_verified_referral(user_id):
     """
-    After the user verifies by joining the required channels, check if they have a pending referral.
-    If so, award the referrer 4 points and clear the pending referral.
+    After the user verifies, check if they have a pending referral.
+    If yes, award 4 points to the referrer and clear the pending referral.
     """
     user = get_user(str(user_id))
     # User tuple: (user_id, username, join_date, points, referrals, banned, pending_referrer)
@@ -29,19 +29,27 @@ def process_verified_referral(user_id):
 
 def send_referral_menu(bot, message):
     """
-    Displays the referral dashboard showing the user's total referrals and points.
-    Provides an inline button to get their referral link.
+    Displays the referral dashboard showing the user's details.
+    If no user record is found, default values are used.
     """
     user_id = str(message.from_user.id)
     user = get_user(user_id)
     if user:
-        text = (f"Referral System:\n"
-                f"Username: {user[1]}\n"
-                f"User ID: {user[0]}\n"
-                f"Total Referrals: {user[4]}\n"
-                f"Points Earned: {user[3]}")
+        text = (
+            f"Referral System:\n"
+            f"Username: {user[1]}\n"
+            f"User ID: {user[0]}\n"
+            f"Total Referrals: {user[4]}\n"
+            f"Points Earned: {user[3]}"
+        )
     else:
-        text = "No referral data available."
+        text = (
+            f"Referral System:\n"
+            f"Username: {message.from_user.username or message.from_user.first_name}\n"
+            f"User ID: {user_id}\n"
+            "Total Referrals: 0\n"
+            "Points Earned: 0"
+        )
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("Get Referral Link", callback_data="get_ref_link"))
     markup.add(types.InlineKeyboardButton("Back", callback_data="back_main"))
@@ -52,4 +60,4 @@ def get_referral_link(user_id):
     Returns a permanent referral link for the user.
     """
     return f"https://t.me/{config.BOT_USERNAME}?start=ref_{user_id}"
-    
+                
