@@ -5,7 +5,6 @@ def send_account_info(bot, message):
     user_id = str(message.from_user.id)
     user = get_user(user_id)
     if user:
-        # user tuple: (user_id, username, join_date, points, referrals, banned, pending_referrer)
         text = (
             f"👤 *Account Info*\n"
             f"• *Username:* {user[1]}\n"
