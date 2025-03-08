@@ -73,5 +73,6 @@ def claim_account(bot, call, platform):
     index = random.randint(0, len(stock) - 1)
     account = stock.pop(index)
     update_stock_for_platform(platform, stock)
-    bot.answer_callback_query(call.id, f"🎉 Account claimed!")
+    bot.answer_callback_query(call.id, "🎉 Account claimed!")
     bot.send_message(call.message.chat.id, f"💳 *Your account for {platform}:*\n`{account}`", parse_mode="Markdown")
+    
