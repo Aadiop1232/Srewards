@@ -20,7 +20,7 @@ def init_db():
         )
     ''')
     
-    # Referrals table (records each referral only once)
+    # Referrals table
     c.execute('''
         CREATE TABLE IF NOT EXISTS referrals (
             user_id TEXT,
@@ -29,7 +29,7 @@ def init_db():
         )
     ''')
     
-    # Platforms table (stores platform names and stock as JSON)
+    # Platforms table
     c.execute('''
         CREATE TABLE IF NOT EXISTS platforms (
             platform_name TEXT PRIMARY KEY,
@@ -57,7 +57,7 @@ def init_db():
         )
     ''')
     
-    # Channels table (for verification)
+    # Channels table
     c.execute('''
         CREATE TABLE IF NOT EXISTS channels (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,7 +75,7 @@ def init_db():
         )
     ''')
     
-    # Keys table (for key generation system)
+    # Keys table
     c.execute('''
         CREATE TABLE IF NOT EXISTS keys (
             key TEXT PRIMARY KEY,
@@ -123,13 +123,11 @@ def clear_pending_referral(user_id):
 def add_referral(referrer_id, referred_id):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    # Only add if this referred_id hasn't been recorded yet.
     c.execute("SELECT * FROM referrals WHERE referred_id=?", (referred_id,))
     if c.fetchone():
         conn.close()
         return
     c.execute("INSERT INTO referrals (user_id, referred_id) VALUES (?, ?)", (referrer_id, referred_id))
-    # Award 4 points and increment referral count for the referrer.
     c.execute("UPDATE users SET points = points + 4, referrals = referrals + 1 WHERE user_id=?", (referrer_id,))
     conn.commit()
     conn.close()
