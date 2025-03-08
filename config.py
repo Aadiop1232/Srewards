@@ -1,5 +1,5 @@
 # config.py
-TOKEN = "7760154469:AAGMqehCHodpHnnpKBLJCUrPqWd-QvDVZYg"  # Replace with your actual bot token
+TOKEN = "7760154469:AAHXLYuSgHHWpP9TVUm-bPiy0wBI0U_wHTg"  # Replace with your actual bot token
 BOT_USERNAME = "ShadowRewardsBot"  # Without the '@'
 
 # Hard-coded owner IDs and admin IDs (strings)
