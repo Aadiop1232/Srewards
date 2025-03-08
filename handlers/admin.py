@@ -135,7 +135,7 @@ def unban_user(user_id):
     conn.commit()
     conn.close()
 
-# --- Keys Generation ---
+# --- Keys Generation (Now via /gen command and /claim command) ---
 def generate_normal_key():
     return "NKEY-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
 
@@ -157,6 +157,25 @@ def get_keys():
     conn.close()
     return rows
 
+# --- Key Claim Function (for /claim command) ---
+def claim_key_in_db(key, user_id):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT claimed, type, points FROM keys WHERE key=?", (key,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        return "Key not found."
+    if row[0] != 0:
+        conn.close()
+        return "Key already claimed."
+    points = row[2]
+    c.execute("UPDATE keys SET claimed=1, claimed_by=? WHERE key=?", (user_id, key))
+    c.execute("UPDATE users SET points = points + ? WHERE user_id=?", (points, user_id))
+    conn.commit()
+    conn.close()
+    return f"Key claimed successfully. You've been awarded {points} points."
+
 # --- Admin Panel Handlers ---
 def is_owner(user_id):
     uid = str(user_id)
@@ -164,7 +183,7 @@ def is_owner(user_id):
 
 def is_admin(user_id):
     uid = str(user_id)
-    print(f"[DEBUG] Checking admin status for user {uid}; Config OWNERS: {config.OWNERS}")
+    # Check both owners and admins.
     if uid in config.OWNERS:
         return True
     conn = get_db_connection()
@@ -177,25 +196,23 @@ def is_admin(user_id):
 def send_admin_menu(bot, message):
     uid = str(message.from_user.id)
     if not is_admin(message.from_user.id):
-        bot.send_message(message.chat.id, f"🚫 *Access prohibited!* (Your ID: {uid})", parse_mode="Markdown")
+        bot.send_message(message.chat.id, f"🚫 *Access prohibited!*", parse_mode="Markdown")
         return
     markup = types.InlineKeyboardMarkup(row_width=2)
+    # Both owners and admins may use the panel; owners see extra options.
     if is_owner(message.from_user.id):
         markup.add(
             types.InlineKeyboardButton("📺 Platform Mgmt", callback_data="admin_platform"),
             types.InlineKeyboardButton("📈 Stock Mgmt", callback_data="admin_stock"),
             types.InlineKeyboardButton("🔗 Channel Mgmt", callback_data="admin_channel"),
             types.InlineKeyboardButton("👥 Admin Mgmt", callback_data="admin_manage"),
-            types.InlineKeyboardButton("👤 User Mgmt", callback_data="admin_users"),
-            types.InlineKeyboardButton("🔑 Key Gen", callback_data="admin_keys"),
             types.InlineKeyboardButton("➕ Add Admin", callback_data="admin_add")
         )
     else:
         markup.add(
             types.InlineKeyboardButton("📺 Platform Mgmt", callback_data="admin_platform"),
             types.InlineKeyboardButton("📈 Stock Mgmt", callback_data="admin_stock"),
-            types.InlineKeyboardButton("👤 User Mgmt", callback_data="admin_users"),
-            types.InlineKeyboardButton("🔑 Key Gen", callback_data="admin_keys")
+            types.InlineKeyboardButton("👤 User Mgmt", callback_data="admin_users")
         )
     markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
     bot.send_message(message.chat.id, "🛠 *Admin Panel* 🛠", parse_mode="Markdown", reply_markup=markup)
@@ -257,18 +274,16 @@ def handle_admin_stock(bot, call):
                             message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
 def handle_admin_stock_platform(bot, call, platform):
-    msg = bot.send_message(call.message.chat.id, f"✏️ *Send the stock text for platform {platform}:*\n(You can either type or attach a .txt file)", parse_mode="Markdown")
+    msg = bot.send_message(call.message.chat.id, f"✏️ *Send the stock text for platform {platform}:*\n(You can type or attach a .txt file)", parse_mode="Markdown")
     bot.register_next_step_handler(msg, process_stock_upload, platform)
 
 def process_stock_upload(message, platform):
     """
     Process uploaded stock data.
-    Accepts a text message or a document (.txt file).
-    Uses a regex to detect lines starting with an email address.
-    Lines that do not start with an email are appended to the previous account entry.
+    Accepts text or a document (.txt file).
+    Groups lines into one account entry until a line starting with an email is found.
     """
     bot_instance = telebot.TeleBot(config.TOKEN)
-    
     if message.content_type == "document":
         file_info = bot_instance.get_file(message.document.file_id)
         downloaded_file = bot_instance.download_file(file_info.file_path)
@@ -279,7 +294,6 @@ def process_stock_upload(message, platform):
             return
     else:
         data = message.text.strip()
-    
     email_pattern = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+")
     accounts = []
     current_account = ""
@@ -295,7 +309,6 @@ def process_stock_upload(message, platform):
             current_account += " " + line
     if current_account:
         accounts.append(current_account.strip())
-    
     add_stock_to_platform(platform, accounts)
     bot_instance.send_message(message.chat.id,
                               f"✅ Stock for *{platform}* updated with {len(accounts)} accounts.",
@@ -487,7 +500,6 @@ def handle_admin_users(bot, call):
     markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
     bot.edit_message_text(text, chat_id=call.message.chat.id,
                             message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
-
 def handle_user_ban_unban(bot, call):
     msg = bot.send_message(call.message.chat.id, "✏️ *Send the UserID to ban/unban:*", parse_mode="Markdown")
     bot.register_next_step_handler(msg, process_user_ban_unban)
@@ -514,59 +526,11 @@ def process_user_ban_unban(message):
 
 # --- KEYS GENERATION HANDLERS ---
 def handle_admin_keys(bot, call):
-    # Immediately prompt for key generation; remove "view keys" option.
+    # Remove key-generation buttons; instruct to use /gen command.
     markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        types.InlineKeyboardButton("🔑 Gen Normal Key", callback_data="gen_normal_keys"),
-        types.InlineKeyboardButton("🔑 Gen Premium Key", callback_data="gen_premium_keys")
-    )
     markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
-    bot.edit_message_text("🔑 *Key Generation* 🔑\nSelect key type:", chat_id=call.message.chat.id,
+    bot.edit_message_text("🔑 *Key Generation* is now available via the /gen command.", chat_id=call.message.chat.id,
                             message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
-
-def handle_gen_normal_keys(bot, call):
-    msg = bot.send_message(call.message.chat.id, "✏️ *Enter quantity of normal keys to generate:*", parse_mode="Markdown")
-    bot.register_next_step_handler(msg, process_gen_normal_keys)
-
-def process_gen_normal_keys(message):
-    try:
-        qty = int(message.text.strip())
-    except:
-        qty = 1
-    generated = []
-    for _ in range(qty):
-        key = generate_normal_key()
-        add_key(key, "normal", 15)
-        generated.append(key)
-    response = "✅ *Normal Keys Generated:*\n" + "\n".join(generated)
-    bot = telebot.TeleBot(config.TOKEN)
-    bot.send_message(message.chat.id, response, parse_mode="Markdown")
-    send_admin_menu(bot, message)
-
-def handle_gen_premium_keys(bot, call):
-    msg = bot.send_message(call.message.chat.id, "✏️ *Enter quantity of premium keys to generate:*", parse_mode="Markdown")
-    bot.register_next_step_handler(msg, process_gen_premium_keys)
-
-def process_gen_premium_keys(message):
-    try:
-        qty = int(message.text.strip())
-    except:
-        qty = 1
-    generated = []
-    for _ in range(qty):
-        key = generate_premium_key()
-        add_key(key, "premium", 35)
-        generated.append(key)
-    response = "✅ *Premium Keys Generated:*\n" + "\n".join(generated)
-    bot = telebot.TeleBot(config.TOKEN)
-    bot.send_message(message.chat.id, response, parse_mode="Markdown")
-    send_admin_menu(bot, message)
-
-def generate_normal_key():
-    return "NKEY-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
-
-def generate_premium_key():
-    return "PKEY-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
 
 # --- Callback Router ---
 def admin_callback_handler(bot, call):
@@ -614,10 +578,6 @@ def admin_callback_handler(bot, call):
         handle_user_ban_unban(bot, call)
     elif data == "admin_keys":
         handle_admin_keys(bot, call)
-    elif data == "gen_normal_keys":
-        handle_gen_normal_keys(bot, call)
-    elif data == "gen_premium_keys":
-        handle_gen_premium_keys(bot, call)
     elif data == "back_main":
         from handlers.main_menu import send_main_menu
         send_main_menu(bot, call.message)
