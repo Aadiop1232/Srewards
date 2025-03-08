@@ -7,13 +7,13 @@ def init_db():
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     
-    # Users table
+    # Users table with default points = 20
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id TEXT PRIMARY KEY,
             username TEXT,
             join_date TEXT,
-            points INTEGER DEFAULT 0,
+            points INTEGER DEFAULT 20,
             referrals INTEGER DEFAULT 0,
             banned INTEGER DEFAULT 0,
             pending_referrer TEXT
@@ -75,7 +75,7 @@ def init_db():
         )
     ''')
     
-    # Keys table
+    # Keys table (for voucher-like key redemption)
     c.execute('''
         CREATE TABLE IF NOT EXISTS keys (
             key TEXT PRIMARY KEY,
@@ -146,7 +146,7 @@ def log_admin_action(admin_id, action):
     conn.commit()
     conn.close()
 
-# --- Key Claim Functions ---
+# --- Key Redemption Functions ---
 def get_key(key):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
@@ -172,3 +172,11 @@ def claim_key_in_db(key, user_id):
     conn.commit()
     conn.close()
     return f"Key claimed successfully. You've been awarded {points} points."
+
+def update_user_points(user_id, points):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("UPDATE users SET points=? WHERE user_id=?", (points, user_id))
+    conn.commit()
+    conn.close()
+                       
