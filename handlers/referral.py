@@ -18,7 +18,7 @@ def extract_referral_code(message):
 def process_verified_referral(user_id):
     """
     After the user verifies, check if they have a pending referral.
-    If yes, award 4 points to the referrer and clear the pending referral.
+    If yes, award the referrer 4 points and clear the pending referral.
     """
     user = get_user(str(user_id))
     # User tuple: (user_id, username, join_date, points, referrals, banned, pending_referrer)
@@ -36,28 +36,28 @@ def send_referral_menu(bot, message):
     user = get_user(user_id)
     if user:
         text = (
-            f"Referral System:\n"
-            f"Username: {user[1]}\n"
-            f"User ID: {user[0]}\n"
-            f"Total Referrals: {user[4]}\n"
-            f"Points Earned: {user[3]}"
+            f"🔗 *Referral System*\n"
+            f"• *Username:* {user[1]}\n"
+            f"• *User ID:* {user[0]}\n"
+            f"• *Total Referrals:* {user[4]}\n"
+            f"• *Points Earned:* {user[3]}"
         )
     else:
         text = (
-            f"Referral System:\n"
-            f"Username: {message.from_user.username or message.from_user.first_name}\n"
-            f"User ID: {user_id}\n"
-            "Total Referrals: 0\n"
-            "Points Earned: 0"
+            f"🔗 *Referral System*\n"
+            f"• *Username:* {message.from_user.username or message.from_user.first_name}\n"
+            f"• *User ID:* {user_id}\n"
+            "• *Total Referrals:* 0\n"
+            "• *Points Earned:* 0"
         )
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("Get Referral Link", callback_data="get_ref_link"))
-    markup.add(types.InlineKeyboardButton("Back", callback_data="back_main"))
-    bot.send_message(message.chat.id, text, reply_markup=markup)
+    markup.add(types.InlineKeyboardButton("🌟 Get Referral Link", callback_data="get_ref_link"))
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
+    bot.send_message(message.chat.id, text, parse_mode="Markdown", reply_markup=markup)
 
 def get_referral_link(user_id):
     """
     Returns a permanent referral link for the user.
     """
     return f"https://t.me/{config.BOT_USERNAME}?start=ref_{user_id}"
-                
+    
