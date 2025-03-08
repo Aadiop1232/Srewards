@@ -146,7 +146,29 @@ def log_admin_action(admin_id, action):
     conn.commit()
     conn.close()
 
-if __name__ == '__main__':
-    init_db()
-    print("✅ Database initialized!")
-    
+# --- Key Claim Functions ---
+def get_key(key):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT key, type, points, claimed FROM keys WHERE key=?", (key,))
+    result = c.fetchone()
+    conn.close()
+    return result
+
+def claim_key_in_db(key, user_id):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT claimed, type, points FROM keys WHERE key=?", (key,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        return "Key not found."
+    if row[0] != 0:
+        conn.close()
+        return "Key already claimed."
+    points = row[2]
+    c.execute("UPDATE keys SET claimed=1, claimed_by=? WHERE key=?", (user_id, key))
+    c.execute("UPDATE users SET points = points + ? WHERE user_id=?", (points, user_id))
+    conn.commit()
+    conn.close()
+    return f"Key claimed successfully. You've been awarded {points} points."
