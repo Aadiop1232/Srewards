@@ -11,8 +11,10 @@ def check_channel_membership(bot, user_id):
     """
     for channel in config.REQUIRED_CHANNELS:
         try:
+            # Extract the channel username from the URL and prepend '@'
             channel_username = channel.split("/")[-1]
-            member = bot.get_chat_member(user_id, channel_username)
+            chat_id = "@" + channel_username
+            member = bot.get_chat_member(chat_id, user_id)
             if member.status not in ["member", "creator", "administrator"]:
                 return False
         except Exception as e:
