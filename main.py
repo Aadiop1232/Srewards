@@ -18,14 +18,17 @@ init_db()
 @bot.message_handler(commands=["start"])
 def start_command(message):
     user_id = str(message.from_user.id)
+    # Extract referral code from /start command if present
     from handlers.referral import extract_referral_code
     pending_ref = extract_referral_code(message)
+    # If the user is not in DB, add them with the pending referral (can be None)
     user = get_user(user_id)
     if not user:
         add_user(user_id,
                  message.from_user.username or message.from_user.first_name,
                  datetime.now().strftime("%Y-%m-%d"),
                  pending_referrer=pending_ref)
+    # Automatically check verification each time /start is invoked
     from handlers.verification import send_verification_message
     send_verification_message(bot, message)
 
@@ -36,8 +39,8 @@ def callback_back_main(call):
 @bot.callback_query_handler(func=lambda call: call.data == "get_ref_link")
 def callback_get_ref_link(call):
     ref_link = get_referral_link(call.from_user.id)
-    bot.answer_callback_query(call.id, f"Your referral link: {ref_link}")
-    bot.send_message(call.message.chat.id, f"Your referral link: {ref_link}")
+    bot.answer_callback_query(call.id, f"🔗 Your referral link: {ref_link}")
+    bot.send_message(call.message.chat.id, f"🔗 *Your referral link:*\n{ref_link}", parse_mode="Markdown")
 
 @bot.callback_query_handler(func=lambda call: call.data == "menu_rewards")
 def callback_menu_rewards(call):
@@ -78,4 +81,4 @@ def callback_menu_main(call):
     send_main_menu(bot, call.message)
 
 bot.polling(none_stop=True)
-    
+                       
