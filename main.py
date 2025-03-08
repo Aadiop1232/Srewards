@@ -4,7 +4,7 @@ from telebot import types
 import config
 from datetime import datetime
 from db import init_db, add_user, get_user
-from handlers.verification import send_verification_message
+from handlers.verification import send_verification_message, handle_verification_callback
 from handlers.main_menu import send_main_menu
 from handlers.referral import extract_referral_code, process_verified_referral, send_referral_menu, get_referral_link
 from handlers.rewards import send_rewards_menu, handle_platform_selection, claim_account
@@ -18,18 +18,14 @@ init_db()
 @bot.message_handler(commands=["start"])
 def start_command(message):
     user_id = str(message.from_user.id)
-    # Extract referral code from /start command if present
-    from handlers.referral import extract_referral_code
+    # Extract referral code if present.
     pending_ref = extract_referral_code(message)
-    # If the user is not in DB, add them with the pending referral (can be None)
     user = get_user(user_id)
     if not user:
         add_user(user_id,
                  message.from_user.username or message.from_user.first_name,
                  datetime.now().strftime("%Y-%m-%d"),
                  pending_referrer=pending_ref)
-    # Automatically check verification each time /start is invoked
-    from handlers.verification import send_verification_message
     send_verification_message(bot, message)
 
 @bot.callback_query_handler(func=lambda call: call.data == "back_main")
@@ -80,5 +76,9 @@ def callback_admin(call):
 def callback_menu_main(call):
     send_main_menu(bot, call.message)
 
+@bot.callback_query_handler(func=lambda call: call.data == "verify")
+def callback_verify(call):
+    handle_verification_callback(bot, call)
+    process_verified_referral(call.from_user.id)
+
 bot.polling(none_stop=True)
-                       
