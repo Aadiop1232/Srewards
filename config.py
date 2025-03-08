@@ -1,8 +1,8 @@
 # config.py
-TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+TOKEN = "7760154469:AAHlYx4gtIGDCWWv-ahrj4yrLm_cPGNgmHs"
 # Multiple owners can be added as strings (Telegram numeric IDs)
-OWNERS = ["123456789", "987654321"]  
-BOT_USERNAME = "YourBotName"  # Without the '@'
+OWNERS = ["7218606355", "987654321"]  
+BOT_USERNAME = "ShadowRewardsBot"  # Without the '@'
 REQUIRED_CHANNELS = [
     "https://t.me/shadowsquad0",
     "https://t.me/Originlabs",
