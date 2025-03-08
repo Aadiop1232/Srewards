@@ -160,6 +160,8 @@ def get_keys():
 # --- Admin Panel Handlers ---
 def is_admin(user_id):
     uid = str(user_id)
+    # Debug output: print the user ID and owners from config
+    print(f"[DEBUG] Checking admin status for user {uid}; Config OWNERS: {config.OWNERS}")
     # Check if user is in the OWNERS list
     if uid in config.OWNERS:
         return True
@@ -172,8 +174,9 @@ def is_admin(user_id):
     return row is not None
 
 def send_admin_menu(bot, message):
+    uid = str(message.from_user.id)
     if not is_admin(message.from_user.id):
-        bot.send_message(message.chat.id, "🚫 *Access prohibited!*", parse_mode="Markdown")
+        bot.send_message(message.chat.id, f"🚫 *Access prohibited!* (Your ID: {uid}, Owners: {config.OWNERS})", parse_mode="Markdown")
         return
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
