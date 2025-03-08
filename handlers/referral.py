@@ -17,8 +17,8 @@ def extract_referral_code(message):
 
 def process_verified_referral(user_id):
     """
-    After the user verifies, check if they have a pending referral.
-    If yes, award the referrer 4 points and clear the pending referral.
+    After verification, if the user has a pending referral,
+    award the referrer 4 points and clear the pending referral.
     """
     user = get_user(str(user_id))
     # User tuple: (user_id, username, join_date, points, referrals, banned, pending_referrer)
@@ -29,8 +29,7 @@ def process_verified_referral(user_id):
 
 def send_referral_menu(bot, message):
     """
-    Displays the referral dashboard showing the user's details.
-    If no user record is found, default values are used.
+    Displays the referral dashboard.
     """
     user_id = str(message.from_user.id)
     user = get_user(user_id)
@@ -57,7 +56,7 @@ def send_referral_menu(bot, message):
 
 def get_referral_link(user_id):
     """
-    Returns a permanent referral link for the user.
+    Returns a referral link.
     """
     return f"https://t.me/{config.BOT_USERNAME}?start=ref_{user_id}"
     
