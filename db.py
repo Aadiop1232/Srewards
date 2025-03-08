@@ -7,7 +7,7 @@ def init_db():
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     
-    # Users table (language removed)
+    # Users table (without language system)
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id TEXT PRIMARY KEY,
@@ -20,7 +20,7 @@ def init_db():
         )
     ''')
     
-    # Referrals table
+    # Referrals table to record which user referred which
     c.execute('''
         CREATE TABLE IF NOT EXISTS referrals (
             user_id TEXT,
@@ -29,7 +29,7 @@ def init_db():
         )
     ''')
     
-    # Platforms table: stores platform name and stock (as JSON)
+    # Platforms table: stores platform names and stock (as JSON)
     c.execute('''
         CREATE TABLE IF NOT EXISTS platforms (
             platform_name TEXT PRIMARY KEY,
@@ -123,7 +123,7 @@ def clear_pending_referral(user_id):
 def add_referral(referrer_id, referred_id):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    # Only record if this referred_id is not already recorded
+    # Check if this referral already exists
     c.execute("SELECT * FROM referrals WHERE referred_id=?", (referred_id,))
     if c.fetchone():
         conn.close()
@@ -134,6 +134,14 @@ def add_referral(referrer_id, referred_id):
     conn.commit()
     conn.close()
 
+def add_review(user_id, review):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("INSERT INTO reviews (user_id, review) VALUES (?, ?)", (user_id, review))
+    conn.commit()
+    conn.close()
+
 if __name__ == '__main__':
     init_db()
     print("Database initialized.")
+    
