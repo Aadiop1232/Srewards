@@ -2,7 +2,7 @@
 import telebot
 from telebot import types
 import sqlite3
-import random, string, json
+import random, string, json, re
 import config
 from db import DATABASE, log_admin_action
 
@@ -86,7 +86,7 @@ def get_admins():
 def add_admin(user_id, username, role="admin"):
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("INSERT OR REPLACE INTO admins (user_id, username, role, banned) VALUES (?, ?, ?, ?)", 
+    c.execute("INSERT OR REPLACE INTO admins (user_id, username, role, banned) VALUES (?, ?, ?, ?)",
               (str(user_id), username, role, 0))
     conn.commit()
     conn.close()
@@ -158,14 +158,15 @@ def get_keys():
     return rows
 
 # --- Admin Panel Handlers ---
+def is_owner(user_id):
+    uid = str(user_id)
+    return uid in config.OWNERS
+
 def is_admin(user_id):
     uid = str(user_id)
-    # Debug output: print the user ID and owners from config
     print(f"[DEBUG] Checking admin status for user {uid}; Config OWNERS: {config.OWNERS}")
-    # Check if user is in the OWNERS list
     if uid in config.OWNERS:
         return True
-    # Otherwise, check the admins table
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM admins WHERE user_id=? AND banned=0", (uid,))
@@ -176,18 +177,27 @@ def is_admin(user_id):
 def send_admin_menu(bot, message):
     uid = str(message.from_user.id)
     if not is_admin(message.from_user.id):
-        bot.send_message(message.chat.id, f"🚫 *Access prohibited!* (Your ID: {uid}, Owners: {config.OWNERS})", parse_mode="Markdown")
+        bot.send_message(message.chat.id, f"🚫 *Access prohibited!* (Your ID: {uid})", parse_mode="Markdown")
         return
     markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        types.InlineKeyboardButton("📺 Platform Mgmt", callback_data="admin_platform"),
-        types.InlineKeyboardButton("📈 Stock Mgmt", callback_data="admin_stock"),
-        types.InlineKeyboardButton("🔗 Channel Mgmt", callback_data="admin_channel"),
-        types.InlineKeyboardButton("👥 Admin Mgmt", callback_data="admin_manage"),
-        types.InlineKeyboardButton("👤 User Mgmt", callback_data="admin_users"),
-        types.InlineKeyboardButton("🔑 Key Gen", callback_data="admin_keys")
-    )
-    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_back"))
+    if is_owner(message.from_user.id):
+        markup.add(
+            types.InlineKeyboardButton("📺 Platform Mgmt", callback_data="admin_platform"),
+            types.InlineKeyboardButton("📈 Stock Mgmt", callback_data="admin_stock"),
+            types.InlineKeyboardButton("🔗 Channel Mgmt", callback_data="admin_channel"),
+            types.InlineKeyboardButton("👥 Admin Mgmt", callback_data="admin_manage"),
+            types.InlineKeyboardButton("👤 User Mgmt", callback_data="admin_users"),
+            types.InlineKeyboardButton("🔑 Key Gen", callback_data="admin_keys"),
+            types.InlineKeyboardButton("➕ Add Admin", callback_data="admin_add")
+        )
+    else:
+        markup.add(
+            types.InlineKeyboardButton("📺 Platform Mgmt", callback_data="admin_platform"),
+            types.InlineKeyboardButton("📈 Stock Mgmt", callback_data="admin_stock"),
+            types.InlineKeyboardButton("👤 User Mgmt", callback_data="admin_users"),
+            types.InlineKeyboardButton("🔑 Key Gen", callback_data="admin_keys")
+        )
+    markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
     bot.send_message(message.chat.id, "🛠 *Admin Panel* 🛠", parse_mode="Markdown", reply_markup=markup)
 
 # --- PLATFORM MANAGEMENT HANDLERS ---
@@ -197,7 +207,7 @@ def handle_admin_platform(bot, call):
         types.InlineKeyboardButton("➕ Add Platform", callback_data="admin_platform_add"),
         types.InlineKeyboardButton("➖ Remove Platform", callback_data="admin_platform_remove")
     )
-    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_back"))
+    markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
     bot.edit_message_text("📺 *Platform Management* 📺", chat_id=call.message.chat.id,
                             message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
@@ -242,34 +252,74 @@ def handle_admin_stock(bot, call):
     markup = types.InlineKeyboardMarkup(row_width=2)
     for plat in platforms:
         markup.add(types.InlineKeyboardButton(plat, callback_data=f"admin_stock_{plat}"))
-    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_back"))
+    markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
     bot.edit_message_text("📈 *Select a platform to add stock:*", chat_id=call.message.chat.id,
                             message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
 def handle_admin_stock_platform(bot, call, platform):
-    msg = bot.send_message(call.message.chat.id, f"✏️ *Send the stock text for platform {platform}:*\n(Each account on a new line)", parse_mode="Markdown")
+    msg = bot.send_message(call.message.chat.id, f"✏️ *Send the stock text for platform {platform}:*\n(You can either type or attach a .txt file)", parse_mode="Markdown")
     bot.register_next_step_handler(msg, process_stock_upload, platform)
 
 def process_stock_upload(message, platform):
-    data = message.text.strip()
-    accounts = data.splitlines()
+    """
+    Process uploaded stock data.
+    Accepts a text message or a document (.txt file).
+    Uses a regex to detect lines starting with an email address.
+    Lines that do not start with an email are appended to the previous account entry.
+    """
+    bot_instance = telebot.TeleBot(config.TOKEN)
+    
+    if message.content_type == "document":
+        file_info = bot_instance.get_file(message.document.file_id)
+        downloaded_file = bot_instance.download_file(file_info.file_path)
+        try:
+            data = downloaded_file.decode('utf-8')
+        except Exception as e:
+            bot_instance.send_message(message.chat.id, f"❌ Error decoding file: {e}")
+            return
+    else:
+        data = message.text.strip()
+    
+    email_pattern = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+")
+    accounts = []
+    current_account = ""
+    for line in data.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if email_pattern.match(line):
+            if current_account:
+                accounts.append(current_account.strip())
+            current_account = line
+        else:
+            current_account += " " + line
+    if current_account:
+        accounts.append(current_account.strip())
+    
     add_stock_to_platform(platform, accounts)
-    bot = telebot.TeleBot(config.TOKEN)
-    bot.send_message(message.chat.id, f"✅ Stock for *{platform}* updated with {len(accounts)} accounts.", parse_mode="Markdown")
-    send_admin_menu(bot, message)
+    bot_instance.send_message(message.chat.id,
+                              f"✅ Stock for *{platform}* updated with {len(accounts)} accounts.",
+                              parse_mode="Markdown")
+    send_admin_menu(bot_instance, message)
 
-# --- CHANNEL MANAGEMENT HANDLERS ---
+# --- CHANNEL MANAGEMENT HANDLERS (Owners Only) ---
 def handle_admin_channel(bot, call):
+    if not is_owner(call.from_user.id):
+        bot.answer_callback_query(call.id, "🚫 Access prohibited. Only owners can manage channels.")
+        return
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton("➕ Add Channel", callback_data="admin_channel_add"),
         types.InlineKeyboardButton("➖ Remove Channel", callback_data="admin_channel_remove")
     )
-    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_back"))
+    markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
     bot.edit_message_text("🔗 *Channel Management* 🔗", chat_id=call.message.chat.id,
                             message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
 def handle_admin_channel_add(bot, call):
+    if not is_owner(call.from_user.id):
+        bot.answer_callback_query(call.id, "🚫 Access prohibited.")
+        return
     msg = bot.send_message(call.message.chat.id, "✏️ *Send the channel link to add:*", parse_mode="Markdown")
     bot.register_next_step_handler(msg, process_channel_add)
 
@@ -289,6 +339,9 @@ def process_channel_add(message):
     send_admin_menu(bot, message)
 
 def handle_admin_channel_remove(bot, call):
+    if not is_owner(call.from_user.id):
+        bot.answer_callback_query(call.id, "🚫 Access prohibited.")
+        return
     channels = get_channels()
     if not channels:
         bot.answer_callback_query(call.id, "😕 No channels to remove.")
@@ -307,18 +360,19 @@ def handle_admin_channel_rm(bot, call, channel_id):
 
 # --- ADMIN MANAGEMENT (For Owners Only) ---
 def handle_admin_manage(bot, call):
-    if str(call.from_user.id) not in [str(x) for x in config.OWNERS]:
-        bot.answer_callback_query(call.id, "🚫 Access prohibited.")
+    if not is_owner(call.from_user.id):
+        bot.answer_callback_query(call.id, "🚫 Access prohibited. Only owners can manage admins.")
         return
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton("👥 Admin List", callback_data="admin_list"),
         types.InlineKeyboardButton("🚫 Ban/Unban Admin", callback_data="admin_ban_unban"),
         types.InlineKeyboardButton("❌ Remove Admin", callback_data="admin_remove"),
+        types.InlineKeyboardButton("➕ Add Admin", callback_data="admin_add"),
         types.InlineKeyboardButton("👑 Add Owner", callback_data="admin_add_owner"),
         types.InlineKeyboardButton("📝 Admin Logs", callback_data="admin_logs")
     )
-    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_back"))
+    markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
     bot.edit_message_text("👥 *Admin Management* 👥", chat_id=call.message.chat.id,
                             message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
@@ -369,7 +423,29 @@ def process_admin_remove(message):
     bot.send_message(message.chat.id, response, parse_mode="Markdown")
     send_admin_menu(bot, message)
 
+def handle_admin_add(bot, call):
+    if not is_owner(call.from_user.id):
+        bot.answer_callback_query(call.id, "🚫 Access prohibited. Only owners can add admins.")
+        return
+    msg = bot.send_message(call.message.chat.id, "✏️ *Send the UserID and Username (separated by a space) to add as admin:*", parse_mode="Markdown")
+    bot.register_next_step_handler(msg, process_admin_add)
+
+def process_admin_add(message):
+    parts = message.text.strip().split()
+    if len(parts) < 2:
+        response = "❌ Please provide both UserID and Username."
+    else:
+        user_id, username = parts[0], " ".join(parts[1:])
+        add_admin(user_id, username, role="admin")
+        response = f"✅ Admin {user_id} added with username {username}."
+    bot = telebot.TeleBot(config.TOKEN)
+    bot.send_message(message.chat.id, response, parse_mode="Markdown")
+    send_admin_menu(bot, message)
+
 def handle_admin_add_owner(bot, call):
+    if not is_owner(call.from_user.id):
+        bot.answer_callback_query(call.id, "🚫 Access prohibited. Only owners can add owners.")
+        return
     msg = bot.send_message(call.message.chat.id, "✏️ *Send the UserID to add as owner:*", parse_mode="Markdown")
     bot.register_next_step_handler(msg, process_admin_add_owner)
 
@@ -408,7 +484,7 @@ def handle_admin_users(bot, call):
             text += f"• *UserID:* {user[0]}, *Username:* {user[1]}, *Banned:* {user[2]}\n"
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("🚫 Ban/Unban User", callback_data="user_ban_unban"))
-    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_back"))
+    markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
     bot.edit_message_text(text, chat_id=call.message.chat.id,
                             message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
@@ -438,14 +514,14 @@ def process_user_ban_unban(message):
 
 # --- KEYS GENERATION HANDLERS ---
 def handle_admin_keys(bot, call):
+    # Immediately prompt for key generation; remove "view keys" option.
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton("🔑 Generate Normal Keys", callback_data="gen_normal_keys"),
-        types.InlineKeyboardButton("🔑 Generate Premium Keys", callback_data="gen_premium_keys")
+        types.InlineKeyboardButton("🔑 Gen Normal Key", callback_data="gen_normal_keys"),
+        types.InlineKeyboardButton("🔑 Gen Premium Key", callback_data="gen_premium_keys")
     )
-    markup.add(types.InlineKeyboardButton("👀 View Keys", callback_data="view_keys"))
-    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_back"))
-    bot.edit_message_text("🔑 *Key Generation System* 🔑", chat_id=call.message.chat.id,
+    markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
+    bot.edit_message_text("🔑 *Key Generation* 🔑\nSelect key type:", chat_id=call.message.chat.id,
                             message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
 def handle_gen_normal_keys(bot, call):
@@ -486,16 +562,11 @@ def process_gen_premium_keys(message):
     bot.send_message(message.chat.id, response, parse_mode="Markdown")
     send_admin_menu(bot, message)
 
-def handle_view_keys(bot, call):
-    keys = get_keys()
-    if not keys:
-        text = "😕 No keys generated."
-    else:
-        text = "🔑 *Keys:*\n"
-        for k in keys:
-            text += f"• {k[0]} | {k[1]} | Points: {k[2]} | Claimed: {k[3]} | By: {k[4]}\n"
-    bot.edit_message_text(text, chat_id=call.message.chat.id,
-                            message_id=call.message.message_id, parse_mode="Markdown")
+def generate_normal_key():
+    return "NKEY-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+
+def generate_premium_key():
+    return "PKEY-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
 
 # --- Callback Router ---
 def admin_callback_handler(bot, call):
@@ -531,6 +602,8 @@ def admin_callback_handler(bot, call):
         handle_admin_ban_unban(bot, call)
     elif data == "admin_remove":
         handle_admin_remove(bot, call)
+    elif data == "admin_add":
+        handle_admin_add(bot, call)
     elif data == "admin_add_owner":
         handle_admin_add_owner(bot, call)
     elif data == "admin_logs":
@@ -545,9 +618,8 @@ def admin_callback_handler(bot, call):
         handle_gen_normal_keys(bot, call)
     elif data == "gen_premium_keys":
         handle_gen_premium_keys(bot, call)
-    elif data == "view_keys":
-        handle_view_keys(bot, call)
-    elif data == "admin_back":
-        send_admin_menu(bot, call.message)
+    elif data == "back_main":
+        from handlers.main_menu import send_main_menu
+        send_main_menu(bot, call.message)
     else:
         bot.answer_callback_query(call.id, "❓ Unknown admin command.")
