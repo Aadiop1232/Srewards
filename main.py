@@ -4,7 +4,7 @@ from telebot import types
 import config
 from datetime import datetime
 from db import init_db, add_user, get_user
-from handlers.verification import send_verification, handle_verification_callback
+from handlers.verification import send_verification_message
 from handlers.main_menu import send_main_menu
 from handlers.referral import extract_referral_code, process_verified_referral, send_referral_menu, get_referral_link
 from handlers.rewards import send_rewards_menu, handle_platform_selection, claim_account
@@ -19,24 +19,17 @@ init_db()
 @bot.message_handler(commands=["start"])
 def start_command(message):
     user_id = str(message.from_user.id)
-    # Extract referral code if provided in the /start message (e.g., /start ref_<referrer_id>)
+    from handlers.referral import extract_referral_code
     pending_ref = extract_referral_code(message)
-    # If user not in database, add them with pending_referrer (can be None)
     user = get_user(user_id)
     if not user:
         add_user(user_id,
                  message.from_user.username or message.from_user.first_name,
                  datetime.now().strftime("%Y-%m-%d"),
                  pending_referrer=pending_ref)
-    # Send verification screen (welcome message with required channels and Verify button)
-    send_verification(bot, message)
-
-@bot.callback_query_handler(func=lambda call: call.data == "verify")
-def callback_verify(call):
-    # Process verification: check if the user has joined required channels
-    handle_verification_callback(bot, call)
-    # After successful verification, process any pending referral reward
-    process_verified_referral(call.from_user.id)
+    # Automatically check if the user is a member of all required channels.
+    from handlers.verification import send_verification_message
+    send_verification_message(bot, message)
 
 @bot.callback_query_handler(func=lambda call: call.data == "back_main")
 def callback_back_main(call):
@@ -54,7 +47,6 @@ def callback_menu_rewards(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("reward_"))
 def callback_reward(call):
-    # Extract platform name from the callback data
     platform = call.data.split("reward_")[1]
     handle_platform_selection(bot, call, platform)
 
@@ -88,4 +80,3 @@ def callback_menu_main(call):
     send_main_menu(bot, call.message)
 
 bot.polling(none_stop=True)
-                           
