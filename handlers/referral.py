@@ -1,62 +1,78 @@
-# handlers/referral.py
+# handlers/rewards.py
+import telebot
 from telebot import types
-import config
-from db import get_user, add_referral, clear_pending_referral
+import sqlite3
+import json
+import random
+from db import DATABASE
 
-def extract_referral_code(message):
-    """
-    Extracts the referral code from the /start message.
-    Expected format: /start ref_<referrer_id>
-    Returns the referrer_id as a string or None.
-    """
-    if message.text and "ref_" in message.text:
-        for part in message.text.split():
-            if part.startswith("ref_"):
-                return part[len("ref_"):]
-    return None
+def get_db_connection():
+    return sqlite3.connect(DATABASE)
 
-def process_verified_referral(user_id):
-    """
-    After verification, if the user has a pending referral,
-    award the referrer 4 points and clear the pending referral.
-    """
-    user = get_user(str(user_id))
-    # User tuple: (user_id, username, join_date, points, referrals, banned, pending_referrer)
-    if user and user[6]:
-        referrer_id = user[6]
-        add_referral(referrer_id, str(user_id))
-        clear_pending_referral(str(user_id))
+def get_platforms():
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT platform_name FROM platforms")
+    platforms = [row[0] for row in c.fetchall()]
+    conn.close()
+    return platforms
 
-def send_referral_menu(bot, message):
-    """
-    Displays the referral dashboard.
-    """
-    user_id = str(message.from_user.id)
-    user = get_user(user_id)
-    if user:
-        text = (
-            f"🔗 *Referral System*\n"
-            f"• *Username:* {user[1]}\n"
-            f"• *User ID:* {user[0]}\n"
-            f"• *Total Referrals:* {user[4]}\n"
-            f"• *Points Earned:* {user[3]}"
-        )
-    else:
-        text = (
-            f"🔗 *Referral System*\n"
-            f"• *Username:* {message.from_user.username or message.from_user.first_name}\n"
-            f"• *User ID:* {user_id}\n"
-            "• *Total Referrals:* 0\n"
-            "• *Points Earned:* 0"
-        )
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("🌟 Get Referral Link", callback_data="get_ref_link"))
+def get_stock_for_platform(platform_name):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT stock FROM platforms WHERE platform_name=?", (platform_name,))
+    row = c.fetchone()
+    conn.close()
+    if row and row[0]:
+        try:
+            return json.loads(row[0])
+        except Exception:
+            return []
+    return []
+
+def update_stock_for_platform(platform_name, stock):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("UPDATE platforms SET stock=? WHERE platform_name=?", (json.dumps(stock), platform_name))
+    conn.commit()
+    conn.close()
+
+def send_rewards_menu(bot, message):
+    platforms = get_platforms()
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    if not platforms:
+        bot.send_message(message.chat.id, "😢 No platforms available at the moment.")
+        return
+    for platform in platforms:
+        markup.add(types.InlineKeyboardButton(f"📺 {platform}", callback_data=f"reward_{platform}"))
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
-    bot.send_message(message.chat.id, text, parse_mode="Markdown", reply_markup=markup)
+    try:
+        bot.edit_message_text("🎯 *Available Platforms* 🎯", chat_id=message.chat.id,
+                              message_id=message.message_id, parse_mode="Markdown", reply_markup=markup)
+    except Exception:
+        bot.send_message(message.chat.id, "🎯 *Available Platforms* 🎯", parse_mode="Markdown", reply_markup=markup)
 
-def get_referral_link(user_id):
-    """
-    Returns a referral link.
-    """
-    return f"https://t.me/{config.BOT_USERNAME}?start=ref_{user_id}"
+def handle_platform_selection(bot, call, platform):
+    stock = get_stock_for_platform(platform)
+    if stock:
+        text = f"📺 *{platform}*:\n✅ *{len(stock)} accounts available!*"
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        markup.add(types.InlineKeyboardButton("🎁 Claim Account", callback_data=f"claim_{platform}"))
+    else:
+        text = f"📺 *{platform}*:\n😞 No accounts available at the moment."
+        markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="menu_rewards"))
+    bot.edit_message_text(text, chat_id=call.message.chat.id,
+                          message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
+
+def claim_account(bot, call, platform):
+    stock = get_stock_for_platform(platform)
+    if not stock:
+        bot.answer_callback_query(call.id, "😞 No accounts available.")
+        return
+    index = random.randint(0, len(stock) - 1)
+    account = stock.pop(index)
+    update_stock_for_platform(platform, stock)
+    bot.answer_callback_query(call.id, "🎉 Account claimed!")
+    bot.send_message(call.message.chat.id, f"💳 *Your account for {platform}:*\n`{account}`", parse_mode="Markdown")
     
