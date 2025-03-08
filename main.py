@@ -58,16 +58,29 @@ def gen_command(message):
         return
     bot.reply_to(message, "Generated keys:\n" + "\n".join(generated))
 
-@bot.message_handler(commands=["claim"])
-def claim_command(message):
+@bot.message_handler(commands=["redeem"])
+def redeem_command(message):
     user_id = str(message.from_user.id)
     parts = message.text.split()
     if len(parts) < 2:
-        bot.reply_to(message, "Usage: /claim <key>")
+        bot.reply_to(message, "Usage: /redeem <key>")
         return
     key = parts[1].strip()
     result = claim_key_in_db(key, user_id)
     bot.reply_to(message, result)
+
+@bot.message_handler(commands=["tutorial"])
+def tutorial_command(message):
+    text = (
+        "📖 *Tutorial*\n"
+        "1. Every new user starts with 20 points (free points for 10 account claims, as each claim costs 2 points).\n"
+        "2. Claiming an account costs 2 points. Use the Rewards section to claim an account.\n"
+        "3. If you run out of points, you can earn more by referring others or redeeming keys using /redeem <key>.\n"
+        "4. Admins can generate keys using the /gen command: /gen normal <quantity> or /gen premium <quantity>.\n"
+        "5. Redeem keys to add points to your balance.\n"
+        "Good luck! 😊"
+    )
+    bot.send_message(message.chat.id, text, parse_mode="Markdown")
 
 @bot.callback_query_handler(func=lambda call: call.data == "back_main")
 def callback_back_main(call):
@@ -119,4 +132,3 @@ def callback_verify(call):
     process_verified_referral(call.from_user.id)
 
 bot.polling(none_stop=True)
-    
