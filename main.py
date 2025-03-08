@@ -12,7 +12,6 @@ from handlers.account_info import send_account_info
 from handlers.review import prompt_review
 from handlers.admin import send_admin_menu, admin_callback_handler
 
-# Initialize bot and database
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
 init_db()
 
@@ -27,7 +26,6 @@ def start_command(message):
                  message.from_user.username or message.from_user.first_name,
                  datetime.now().strftime("%Y-%m-%d"),
                  pending_referrer=pending_ref)
-    # Automatically check if the user is a member of all required channels.
     from handlers.verification import send_verification_message
     send_verification_message(bot, message)
 
@@ -80,3 +78,4 @@ def callback_menu_main(call):
     send_main_menu(bot, call.message)
 
 bot.polling(none_stop=True)
+    
