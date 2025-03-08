@@ -7,7 +7,7 @@ def init_db():
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     
-    # Users table (no language system)
+    # Users table
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id TEXT PRIMARY KEY,
@@ -20,7 +20,7 @@ def init_db():
         )
     ''')
     
-    # Referrals table to record which user referred which (only once per referred user)
+    # Referrals table (records each referral only once)
     c.execute('''
         CREATE TABLE IF NOT EXISTS referrals (
             user_id TEXT,
@@ -29,7 +29,7 @@ def init_db():
         )
     ''')
     
-    # Platforms table: stores platform names and stock (stored as JSON)
+    # Platforms table (stores platform names and stock as JSON)
     c.execute('''
         CREATE TABLE IF NOT EXISTS platforms (
             platform_name TEXT PRIMARY KEY,
@@ -37,7 +37,7 @@ def init_db():
         )
     ''')
     
-    # Reviews table for user feedback
+    # Reviews table
     c.execute('''
         CREATE TABLE IF NOT EXISTS reviews (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,7 +57,7 @@ def init_db():
         )
     ''')
     
-    # Channels table for verification channels
+    # Channels table (for verification)
     c.execute('''
         CREATE TABLE IF NOT EXISTS channels (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,7 +75,7 @@ def init_db():
         )
     ''')
     
-    # Keys table for key generation system
+    # Keys table (for key generation system)
     c.execute('''
         CREATE TABLE IF NOT EXISTS keys (
             key TEXT PRIMARY KEY,
@@ -129,7 +129,7 @@ def add_referral(referrer_id, referred_id):
         conn.close()
         return
     c.execute("INSERT INTO referrals (user_id, referred_id) VALUES (?, ?)", (referrer_id, referred_id))
-    # Award 4 points and increment referral count for the referrer
+    # Award 4 points and increment referral count for the referrer.
     c.execute("UPDATE users SET points = points + 4, referrals = referrals + 1 WHERE user_id=?", (referrer_id,))
     conn.commit()
     conn.close()
