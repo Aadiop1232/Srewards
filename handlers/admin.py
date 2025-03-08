@@ -547,5 +547,4 @@ def admin_callback_handler(bot, call):
     elif data == "admin_back":
         send_admin_menu(bot, call.message)
     else:
-        bot.answer_callback_query(call.id, "Unknown admin command.")
-    
+        bot.answer_callback_query(call.id, "❓ Unknown admin command.")
