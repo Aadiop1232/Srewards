@@ -17,19 +17,11 @@ def extract_referral_code(message):
 def process_verified_referral(user_id):
     """
     Process a verified referral for a user.
-    (Placeholder function: implement your database logic here to award referral points.)
+    (Implement your database logic here if needed.)
     """
-    # Example (pseudo-code):
-    # user = get_user_from_db(user_id)
-    # if user and user.pending_referrer:
-    #     award_points_to_referrer(user.pending_referrer)
-    #     clear_pending_referral(user_id)
     pass
 
 def send_referral_menu(bot, message):
-    """
-    Displays the referral system dashboard to the user.
-    """
     user_id = str(message.from_user.id)
     text = f"🔗 *Referral System*\nYour referral link is available below."
     markup = telebot.types.InlineKeyboardMarkup()
@@ -38,8 +30,5 @@ def send_referral_menu(bot, message):
     bot.send_message(message.chat.id, text, parse_mode="Markdown", reply_markup=markup)
 
 def get_referral_link(user_id):
-    """
-    Returns the referral link for the given user.
-    """
     return f"https://t.me/{config.BOT_USERNAME}?start=ref_{user_id}"
     
