@@ -135,7 +135,7 @@ def unban_user(user_id):
     conn.commit()
     conn.close()
 
-# --- Keys Generation (Now via /gen command and /claim command) ---
+# --- Keys Generation (Now via /gen and /redeem commands) ---
 def generate_normal_key():
     return "NKEY-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
 
@@ -157,7 +157,7 @@ def get_keys():
     conn.close()
     return rows
 
-# --- Key Claim Function (for /claim command) ---
+# --- Key Claim Function ---
 def claim_key_in_db(key, user_id):
     conn = get_db_connection()
     c = conn.cursor()
@@ -174,7 +174,15 @@ def claim_key_in_db(key, user_id):
     c.execute("UPDATE users SET points = points + ? WHERE user_id=?", (points, user_id))
     conn.commit()
     conn.close()
-    return f"Key claimed successfully. You've been awarded {points} points."
+    return f"Key redeemed successfully. You've been awarded {points} points."
+
+# --- Utility: Update User Points ---
+def update_user_points(user_id, points):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("UPDATE users SET points=? WHERE user_id=?", (points, user_id))
+    conn.commit()
+    conn.close()
 
 # --- Admin Panel Handlers ---
 def is_owner(user_id):
@@ -183,7 +191,7 @@ def is_owner(user_id):
 
 def is_admin(user_id):
     uid = str(user_id)
-    # Check both owners and admins.
+    # Check if user is either an owner or is in the admins table.
     if uid in config.OWNERS:
         return True
     conn = get_db_connection()
@@ -198,8 +206,9 @@ def send_admin_menu(bot, message):
     if not is_admin(message.from_user.id):
         bot.send_message(message.chat.id, f"🚫 *Access prohibited!*", parse_mode="Markdown")
         return
+    # Both admins and owners can access the admin panel.
     markup = types.InlineKeyboardMarkup(row_width=2)
-    # Both owners and admins may use the panel; owners see extra options.
+    # Owners see extra options.
     if is_owner(message.from_user.id):
         markup.add(
             types.InlineKeyboardButton("📺 Platform Mgmt", callback_data="admin_platform"),
@@ -240,6 +249,7 @@ def process_platform_add(message):
         response = f"❌ Error adding platform: {error}"
     else:
         response = f"✅ Platform *{platform_name}* added successfully!"
+    # Avoid Markdown errors by escaping problematic characters if needed.
     bot.send_message(message.chat.id, response, parse_mode="Markdown")
     send_admin_menu(bot, message)
 
@@ -500,6 +510,7 @@ def handle_admin_users(bot, call):
     markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
     bot.edit_message_text(text, chat_id=call.message.chat.id,
                             message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
+
 def handle_user_ban_unban(bot, call):
     msg = bot.send_message(call.message.chat.id, "✏️ *Send the UserID to ban/unban:*", parse_mode="Markdown")
     bot.register_next_step_handler(msg, process_user_ban_unban)
@@ -526,7 +537,7 @@ def process_user_ban_unban(message):
 
 # --- KEYS GENERATION HANDLERS ---
 def handle_admin_keys(bot, call):
-    # Remove key-generation buttons; instruct to use /gen command.
+    # Inform that key generation is via the /gen command.
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
     bot.edit_message_text("🔑 *Key Generation* is now available via the /gen command.", chat_id=call.message.chat.id,
