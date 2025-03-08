@@ -1,5 +1,5 @@
 # config.py
-TOKEN = "7760154469:AAHlYx4gtIGDCWWv-ahrj4yrLm_cPGNgmHs"
+TOKEN = "7760154469:AAGx85RzDhgfVz-eyy5OC7lLdg7xzuRLTAg"
 # Multiple owners can be added as strings (Telegram numeric IDs)
 OWNERS = ["7218606355", "987654321"]  
 BOT_USERNAME = "ShadowRewardsBot"  # Without the '@'
