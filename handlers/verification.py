@@ -46,4 +46,3 @@ def send_verification_message(bot, message):
         for channel in config.REQUIRED_CHANNELS:
             text += f"{channel}\n"
         bot.send_message(message.chat.id, text)
-        
