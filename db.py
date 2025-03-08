@@ -7,7 +7,7 @@ def init_db():
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     
-    # Users table (without language system)
+    # Users table (no language system)
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id TEXT PRIMARY KEY,
@@ -20,7 +20,7 @@ def init_db():
         )
     ''')
     
-    # Referrals table to record which user referred which
+    # Referrals table to record which user referred which (only once per referred user)
     c.execute('''
         CREATE TABLE IF NOT EXISTS referrals (
             user_id TEXT,
@@ -29,7 +29,7 @@ def init_db():
         )
     ''')
     
-    # Platforms table: stores platform names and stock (as JSON)
+    # Platforms table: stores platform names and stock (stored as JSON)
     c.execute('''
         CREATE TABLE IF NOT EXISTS platforms (
             platform_name TEXT PRIMARY KEY,
@@ -57,7 +57,7 @@ def init_db():
         )
     ''')
     
-    # Channels table for verification
+    # Channels table for verification channels
     c.execute('''
         CREATE TABLE IF NOT EXISTS channels (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -123,7 +123,7 @@ def clear_pending_referral(user_id):
 def add_referral(referrer_id, referred_id):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    # Check if this referral already exists
+    # Only add if this referred_id hasn't been recorded yet.
     c.execute("SELECT * FROM referrals WHERE referred_id=?", (referred_id,))
     if c.fetchone():
         conn.close()
@@ -142,9 +142,6 @@ def add_review(user_id, review):
     conn.close()
 
 def log_admin_action(admin_id, action):
-    """
-    Logs an admin action in the admin_logs table.
-    """
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     c.execute("INSERT INTO admin_logs (admin_id, action) VALUES (?, ?)", (admin_id, action))
@@ -153,5 +150,5 @@ def log_admin_action(admin_id, action):
 
 if __name__ == '__main__':
     init_db()
-    print("Database initialized.")
+    print("✅ Database initialized!")
     
