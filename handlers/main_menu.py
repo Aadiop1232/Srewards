@@ -10,4 +10,5 @@ def send_main_menu(bot, message):
     btn_review = types.InlineKeyboardButton("💬 Review", callback_data="menu_review")
     btn_admin = types.InlineKeyboardButton("🛠 Admin Panel", callback_data="menu_admin")
     markup.add(btn_rewards, btn_account, btn_referral, btn_review, btn_admin)
-    bot.send_message(message.chat.id, "📋 *Main Menu* 📋\nPlease choose an option:", parse_mode="Markdown", reply_markup=markup)
+    bot.send_message(message.chat.id, "<b>📋 Main Menu 📋</b>\nPlease choose an option:", parse_mode="HTML", reply_markup=markup)
+    
