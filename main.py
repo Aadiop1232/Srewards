@@ -10,6 +10,7 @@ from handlers.rewards import send_rewards_menu, handle_platform_selection, claim
 from handlers.account_info import send_account_info
 from handlers.review import prompt_review
 from handlers.admin import send_admin_menu, admin_callback_handler, is_admin, generate_normal_key, generate_premium_key, add_key
+import sys
 
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
 init_db()
@@ -128,7 +129,7 @@ def tutorial_command(message):
         "📖 <b>Tutorial</b>\n"
         "1. Every new user starts with 20 points (each account claim costs 2 points).\n"
         "2. To claim an account, go to the Rewards section. If you have at least 2 points, you can claim an account (2 points will be deducted).\n"
-        "3. Earn more points by referring friends (each referral gives 4 points) or redeeming keys (/redeem <key>).\n"
+        "3. Earn more points by referring friends (each referral gives 4 points) or redeeming keys (/redeem &lt;key&gt;).\n"
         "4. Admins/Owners can generate keys using /gen and lend points using /lend.\n"
         "5. Use /notify to broadcast a message to all owners/admins.\n"
         "6. Your account info always shows your real-time balance and referral count (using your Telegram User ID).\n"
@@ -193,4 +194,4 @@ def callback_verify(call):
     process_verified_referral(call.from_user.id)
 
 bot.polling(none_stop=True)
-                                                       
+                                     
