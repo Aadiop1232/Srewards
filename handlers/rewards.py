@@ -66,12 +66,12 @@ def handle_platform_selection(bot, call, platform):
                           message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
 def claim_account(bot, call, platform):
-    user_id = str(call.from_user.id)
-    user = get_user(user_id)
+    telegram_id = str(call.from_user.id)
+    user = get_user(telegram_id)
     if user is None:
         bot.answer_callback_query(call.id, "User not found.")
         return
-    current_points = user[3]
+    current_points = user[4]  # points field (assuming schema: telegram_id, internal_id, username, join_date, points, referrals, banned, pending_referrer)
     if current_points < 2:
         bot.answer_callback_query(call.id, "Insufficient points (each claim costs 2 points). Earn more by referring or redeeming a key.")
         return
@@ -83,7 +83,7 @@ def claim_account(bot, call, platform):
     account = stock.pop(index)
     update_stock_for_platform(platform, stock)
     new_points = current_points - 2
-    update_user_points(user_id, new_points)
+    update_user_points(telegram_id, new_points)
     bot.answer_callback_query(call.id, "🎉 Account claimed!")
     bot.send_message(call.message.chat.id, f"💳 *Your account for {platform}:*\n`{account}`\nRemaining points: {new_points}", parse_mode="Markdown")
-    
+                         
