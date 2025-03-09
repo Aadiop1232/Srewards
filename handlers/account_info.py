@@ -5,17 +5,22 @@ from datetime import datetime
 def send_account_info(bot, update):
     """
     Sends the account information for the user who triggered the update.
-    Uses HTML formatting to avoid Markdown parse errors.
-    Works with both Message and CallbackQuery objects.
+    This function works for both Message and CallbackQuery objects.
+    It uses HTML formatting with newline characters to avoid parse errors.
     """
-    # Determine the sender from the update
-    if hasattr(update, "from_user") and update.from_user:
+    # Determine chat_id and telegram_id from the update
+    if hasattr(update, "message") and update.message:
+        chat_id = update.message.chat.id
+        telegram_id = str(update.message.from_user.id)
+    elif hasattr(update, "from_user") and hasattr(update, "message"):
+        chat_id = update.message.chat.id
         telegram_id = str(update.from_user.id)
     else:
-        # Fallback – should not occur normally
-        telegram_id = "unknown"
+        # Fallback: use update.from_user.id if available
+        chat_id = update.from_user.id
+        telegram_id = str(update.from_user.id)
     
-    # If user is not registered, add them on the fly.
+    # Ensure the user is registered; if not, add them
     user = get_user(telegram_id)
     if not user:
         add_user(
@@ -25,26 +30,16 @@ def send_account_info(bot, update):
         )
         user = get_user(telegram_id)
     
-    # Assuming the user schema is:
-    # (telegram_id, internal_id, username, join_date, points, referrals, banned, pending_referrer)
+    # Build the account info message using HTML and newline characters.
+    # Expected user schema: (telegram_id, internal_id, username, join_date, points, referrals, banned, pending_referrer)
     text = (
-        f"<b>👤 Account Info 😁</b><br>"
-        f"• <b>Username:</b> {user[2]}<br>"
-        f"• <b>User ID:</b> {user[1]}<br>"
-        f"• <b>Join Date:</b> {user[3]}<br>"
-        f"• <b>Balance:</b> {user[4]} points<br>"
+        f"<b>👤 Account Info 😁</b>\n"
+        f"• <b>Username:</b> {user[2]}\n"
+        f"• <b>User ID:</b> {user[1]}\n"
+        f"• <b>Join Date:</b> {user[3]}\n"
+        f"• <b>Balance:</b> {user[4]} points\n"
         f"• <b>Total Referrals:</b> {user[5]}"
     )
     
-    # Determine the proper chat ID for sending the message.
-    # For Message objects, update.chat.id works; for CallbackQuery objects, use update.message.chat.id.
-    if hasattr(update, "chat") and update.chat:
-        chat_id = update.chat.id
-    elif hasattr(update, "message") and update.message:
-        chat_id = update.message.chat.id
-    else:
-        # Fallback: use telegram_id if no chat id is available.
-        chat_id = telegram_id
-
     bot.send_message(chat_id, text, parse_mode="HTML")
     
