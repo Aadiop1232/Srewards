@@ -2,14 +2,11 @@
 from db import get_user
 
 def send_account_info(bot, message):
-    """
-    Retrieves the latest user data from the database and sends a message
-    displaying the real-time balance (points), referral count, join date, and username.
-    """
     user_id = str(message.from_user.id)
+    # Debug log to ensure unique IDs (remove or comment out in production)
+    print(f"DEBUG: Account info requested by user id: {user_id}")
     user = get_user(user_id)
     if user:
-        # user tuple: (user_id, username, join_date, points, referrals, banned, pending_referrer)
         text = (
             f"👤 *Account Info*\n"
             f"• *Username:* {user[1]}\n"
