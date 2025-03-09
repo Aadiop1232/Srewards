@@ -74,7 +74,7 @@ def claim_account(bot, call, platform):
         return
     try:
         # Convert the points field to a number (using float first in case it's stored as a string like "20" or "20.0")
-        current_points = int(float(user[3]))
+        current_points = int(float(user[4]))
     except Exception:
         bot.answer_callback_query(call.id, "Error reading your points.")
         return
