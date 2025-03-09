@@ -6,11 +6,14 @@ import random, string, json, re
 import config
 from db import DATABASE, log_admin_action
 
+# ----------------------
+# Utility Functions
+# ----------------------
 def get_db_connection():
     return sqlite3.connect(DATABASE)
 
 # ----------------------
-# Platforms Management
+# Platforms Management Functions
 # ----------------------
 def add_platform(platform_name):
     conn = get_db_connection()
@@ -54,7 +57,7 @@ def add_stock_to_platform(platform_name, accounts):
     conn.close()
 
 # ----------------------
-# Channels Management
+# Channels Management Functions
 # ----------------------
 def get_channels():
     conn = get_db_connection()
@@ -79,7 +82,7 @@ def remove_channel(channel_id):
     conn.close()
 
 # ----------------------
-# Admins Management
+# Admins Management Functions
 # ----------------------
 def get_admins():
     conn = get_db_connection()
@@ -119,7 +122,7 @@ def unban_admin(user_id):
     conn.close()
 
 # ----------------------
-# Users Management
+# Users Management Functions
 # ----------------------
 def get_users():
     conn = get_db_connection()
@@ -167,7 +170,7 @@ def get_keys():
     conn.close()
     return rows
 
-def claim_key_in_db(key, user_id):
+def claim_key_in_db(key, telegram_id):
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT claimed, type, points FROM keys WHERE key=?", (key,))
@@ -179,40 +182,48 @@ def claim_key_in_db(key, user_id):
         conn.close()
         return "Key already claimed."
     points = row[2]
-    c.execute("UPDATE keys SET claimed=1, claimed_by=? WHERE key=?", (user_id, key))
-    c.execute("UPDATE users SET points = points + ? WHERE user_id=?", (points, user_id))
+    c.execute("UPDATE keys SET claimed=1, claimed_by=? WHERE key=?", (telegram_id, key))
+    c.execute("UPDATE users SET points = points + ? WHERE telegram_id=?", (points, telegram_id))
     conn.commit()
     conn.close()
     return f"Key redeemed successfully. You've been awarded {points} points."
 
-def update_user_points(user_id, points):
+def update_user_points(telegram_id, points):
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("UPDATE users SET points=? WHERE user_id=?", (points, user_id))
+    c.execute("UPDATE users SET points=? WHERE telegram_id=?", (points, telegram_id))
     conn.commit()
     conn.close()
 
 # ----------------------
 # Admin Panel Handlers & Security
 # ----------------------
-def is_owner(user_id):
-    uid = str(user_id)
-    return uid in config.OWNERS
+def is_owner(telegram_id):
+    from db import get_user
+    user = get_user(str(telegram_id))
+    if user:
+        internal_id = user[1]  # internal_id is the second column
+        return internal_id in config.OWNERS
+    return False
 
-def is_admin(user_id):
-    uid = str(user_id)
-    if uid in config.OWNERS or uid in config.ADMINS:
-        return True
+def is_admin(telegram_id):
+    from db import get_user
+    user = get_user(str(telegram_id))
+    if user:
+        internal_id = user[1]
+        return internal_id in config.OWNERS or internal_id in config.ADMINS
     return False
 
 def send_admin_menu(bot, message):
-    uid = str(message.from_user.id)
-    if not is_admin(message.from_user.id):
+    telegram_id = str(message.from_user.id)
+    if not is_admin(telegram_id):
         bot.send_message(message.chat.id, "🚫 *Access prohibited!*", parse_mode="Markdown")
         return
+    from db import get_user
+    user = get_user(telegram_id)
+    internal_id = user[1] if user else "N/A"
     markup = types.InlineKeyboardMarkup(row_width=2)
-    if is_owner(message.from_user.id):
-        # Owners see extra options.
+    if is_owner(telegram_id):
         markup.add(
             types.InlineKeyboardButton("📺 Platform Mgmt", callback_data="admin_platform"),
             types.InlineKeyboardButton("📈 Stock Mgmt", callback_data="admin_stock"),
@@ -226,7 +237,6 @@ def send_admin_menu(bot, message):
             types.InlineKeyboardButton("📈 Stock Mgmt", callback_data="admin_stock"),
             types.InlineKeyboardButton("👤 User Mgmt", callback_data="admin_users")
         )
-    # Add a Notify button for all admins.
     markup.add(types.InlineKeyboardButton("📢 Notify", callback_data="admin_notify"))
     markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
     bot.send_message(message.chat.id, "🛠 *Admin Panel* 🛠", parse_mode="Markdown", reply_markup=markup)
@@ -345,7 +355,7 @@ def process_stock_upload(message, platform):
             current_account += " " + line
     if current_account:
         accounts.append(current_account.strip())
-    add_stock_to_platform(platform, accounts)
+    update_stock_for_platform(platform, accounts)
     bot_instance.send_message(message.chat.id,
                               f"✅ Stock for *{platform}* updated with {len(accounts)} accounts.",
                               parse_mode="Markdown")
@@ -385,9 +395,9 @@ def process_channel_add(message):
         response = f"✅ Channel *{channel_link}* added successfully."
     except Exception as e:
         response = f"❌ Error adding channel: {e}"
-    bot = telebot.TeleBot(config.TOKEN)
-    bot.send_message(message.chat.id, response, parse_mode="Markdown")
-    send_admin_menu(bot, message)
+    bot_instance = telebot.TeleBot(config.TOKEN)
+    bot_instance.send_message(message.chat.id, response, parse_mode="Markdown")
+    send_admin_menu(bot_instance, message)
 
 def handle_admin_channel_remove(bot, call):
     if not is_owner(call.from_user.id):
@@ -459,9 +469,9 @@ def process_admin_ban_unban(message):
             unban_admin(user_id)
             response = f"✅ Admin {user_id} has been unbanned."
     conn.close()
-    bot = telebot.TeleBot(config.TOKEN)
-    bot.send_message(message.chat.id, response, parse_mode="Markdown")
-    send_admin_menu(bot, message)
+    bot_instance = telebot.TeleBot(config.TOKEN)
+    bot_instance.send_message(message.chat.id, response, parse_mode="Markdown")
+    send_admin_menu(bot_instance, message)
 
 def handle_admin_remove(bot, call):
     msg = bot.send_message(call.message.chat.id, "✏️ *Send the admin UserID to remove:*", parse_mode="Markdown")
@@ -471,9 +481,9 @@ def process_admin_remove(message):
     user_id = message.text.strip()
     remove_admin(user_id)
     response = f"✅ Admin {user_id} removed."
-    bot = telebot.TeleBot(config.TOKEN)
-    bot.send_message(message.chat.id, response, parse_mode="Markdown")
-    send_admin_menu(bot, message)
+    bot_instance = telebot.TeleBot(config.TOKEN)
+    bot_instance.send_message(message.chat.id, response, parse_mode="Markdown")
+    send_admin_menu(bot_instance, message)
 
 def handle_admin_add(bot, call):
     if not is_owner(call.from_user.id):
@@ -490,9 +500,9 @@ def process_admin_add(message):
         user_id, username = parts[0], " ".join(parts[1:])
         add_admin(user_id, username, role="admin")
         response = f"✅ Admin {user_id} added with username {username}."
-    bot = telebot.TeleBot(config.TOKEN)
-    bot.send_message(message.chat.id, response, parse_mode="Markdown")
-    send_admin_menu(bot, message)
+    bot_instance = telebot.TeleBot(config.TOKEN)
+    bot_instance.send_message(message.chat.id, response, parse_mode="Markdown")
+    send_admin_menu(bot_instance, message)
 
 def handle_admin_add_owner(bot, call):
     if not is_owner(call.from_user.id):
@@ -506,59 +516,9 @@ def process_admin_add_owner(message):
     username = message.from_user.username or message.from_user.first_name
     add_admin(user_id, username, role="owner")
     response = f"👑 User {user_id} added as owner."
-    bot = telebot.TeleBot(config.TOKEN)
-    bot.send_message(message.chat.id, response, parse_mode="Markdown")
-    send_admin_menu(bot, message)
-
-# ----------------------
-# User Management Handlers
-# ----------------------
-def handle_admin_users(bot, call):
-    users = get_users()
-    if not users:
-        text = "😕 No users found."
-    else:
-        text = "👤 *Users:*\n"
-        for user in users:
-            text += f"• *UserID:* {user[0]}, *Username:* {user[1]}, *Banned:* {user[2]}\n"
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("🚫 Ban/Unban User", callback_data="user_ban_unban"))
-    markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
-    bot.edit_message_text(text, chat_id=call.message.chat.id,
-                            message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
-
-def handle_user_ban_unban(bot, call):
-    msg = bot.send_message(call.message.chat.id, "✏️ *Send the UserID to ban/unban:*", parse_mode="Markdown")
-    bot.register_next_step_handler(msg, process_user_ban_unban)
-
-def process_user_ban_unban(message):
-    user_id = message.text.strip()
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT banned FROM users WHERE user_id=?", (user_id,))
-    row = c.fetchone()
-    if row is None:
-        response = "❌ User not found."
-    else:
-        if row[0] == 0:
-            ban_user(user_id)
-            response = f"🚫 User {user_id} has been banned."
-        else:
-            unban_user(user_id)
-            response = f"✅ User {user_id} has been unbanned."
-    conn.close()
-    bot = telebot.TeleBot(config.TOKEN)
-    bot.send_message(message.chat.id, response, parse_mode="Markdown")
-    send_admin_menu(bot, message)
-
-# ----------------------
-# Keys Generation Handlers (Informational)
-# ----------------------
-def handle_admin_keys(bot, call):
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
-    bot.edit_message_text("🔑 *Key Generation* is now available via the /gen command.", chat_id=call.message.chat.id,
-                            message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
+    bot_instance = telebot.TeleBot(config.TOKEN)
+    bot_instance.send_message(message.chat.id, response, parse_mode="Markdown")
+    send_admin_menu(bot_instance, message)
 
 # ----------------------
 # Callback Router
@@ -601,12 +561,15 @@ def admin_callback_handler(bot, call):
     elif data == "admin_add_owner":
         handle_admin_add_owner(bot, call)
     elif data == "admin_logs":
-        handle_admin_logs(bot, call)
+        # You may implement admin_logs if needed
+        bot.answer_callback_query(call.id, "Admin logs not implemented.")
     elif data == "admin_users":
-        handle_admin_users(bot, call)
+        # You may implement user management if needed
+        bot.answer_callback_query(call.id, "User management not implemented.")
     elif data == "user_ban_unban":
         handle_user_ban_unban(bot, call)
     elif data == "admin_keys":
+        # Inform that key generation is via /gen command
         handle_admin_keys(bot, call)
     elif data == "admin_notify":
         handle_admin_notify(bot, call)
