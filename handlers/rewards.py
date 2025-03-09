@@ -106,9 +106,10 @@ def process_stock_upload(bot, message, platform):
             return
     else:
         data = message.text.strip()
-    # Use re.split to split the text into account blocks.
-    # This splits on a newline that is immediately followed by an email address.
-    accounts = re.split(r'\n(?=[\w\.-]+@[\w\.-]+\.\w+)', data)
+    # Use regex to capture account blocks.
+    # The pattern finds text that starts with an email address and captures until the next email or the end of the text.
+    pattern = r"([\w\.-]+@[\w\.-]+\.\w+.*?)(?=[\w\.-]+@[\w\.-]+\.\w+|$)"
+    accounts = re.findall(pattern, data, flags=re.DOTALL)
     accounts = [acct.strip() for acct in accounts if acct.strip()]
     if not accounts:
         accounts = [data]
@@ -116,6 +117,7 @@ def process_stock_upload(bot, message, platform):
     bot.send_message(message.chat.id,
                      f"✅ Stock for <b>{platform}</b> updated with {len(accounts)} accounts.",
                      parse_mode="HTML")
+    # Return to the admin menu (assuming send_admin_menu is imported from admin.py)
     from handlers.admin import send_admin_menu
     send_admin_menu(bot, message)
-                              
+    
