@@ -5,24 +5,18 @@ from datetime import datetime
 def send_account_info(bot, update):
     """
     Sends the account information for the user who triggered the update.
-    This function works with both Message and CallbackQuery objects and
-    uses HTML formatting.
+    Always uses update.from_user.id as the unique Telegram ID.
+    Uses HTML formatting with newline characters.
     """
-    # Determine chat_id and telegram_id from the update.
-    # For messages:
-    if hasattr(update, "message") and update.message:
-        chat_id = update.message.chat.id
-        telegram_id = str(update.message.from_user.id)
-    # For callback queries:
-    elif hasattr(update, "from_user") and hasattr(update, "message"):
-        chat_id = update.message.chat.id
-        telegram_id = str(update.from_user.id)
-    else:
-        # Fallback if nothing is available (should not happen)
-        chat_id = update.from_user.id
-        telegram_id = str(update.from_user.id)
-    
-    # Ensure the user is registered. If not, register on the fly.
+    # Use update.from_user.id (this should be unique for every user)
+    telegram_id = str(update.from_user.id)
+    # For the chat id, if update.message exists, use its chat id; otherwise, fallback to telegram_id.
+    chat_id = update.message.chat.id if hasattr(update, "message") and update.message else telegram_id
+
+    # Debug print to check which Telegram ID is being used.
+    print("DEBUG: Account info requested by telegram_id:", telegram_id)
+
+    # Retrieve user data. If user is not found, register them.
     user = get_user(telegram_id)
     if not user:
         add_user(
@@ -32,7 +26,7 @@ def send_account_info(bot, update):
         )
         user = get_user(telegram_id)
     
-    # Expected user schema:
+    # Expected user schema: 
     # (telegram_id, internal_id, username, join_date, points, referrals, banned, pending_referrer)
     text = (
         f"<b>👤 Account Info 😁</b>\n"
@@ -42,6 +36,5 @@ def send_account_info(bot, update):
         f"• <b>Balance:</b> {user[4]} points\n"
         f"• <b>Total Referrals:</b> {user[5]}"
     )
-    
     bot.send_message(chat_id, text, parse_mode="HTML")
     
