@@ -193,23 +193,56 @@ def update_user_points(telegram_id, points):
     conn.close()
 
 # ----------------------
-# Admin Panel Handlers & Security (Using Telegram IDs directly)
+# Admin Panel Handlers & Security
 # ----------------------
-def is_owner(telegram_id):
-    # Directly compare the Telegram ID with the ones in config.OWNERS
-    return telegram_id in config.OWNERS
+def is_owner(user_obj):
+    """
+    Checks if the user is an owner.
+    Supports matching either by Telegram ID or by username (case-insensitive).
+    """
+    if not user_obj:
+        return False
+    tid = str(user_obj.id)
+    uname = user_obj.username.lower() if user_obj.username else ""
+    owners = config.OWNERS
+    # Check if Telegram ID matches
+    if tid in owners:
+        print(f"DEBUG: {tid} recognized as owner by ID.")
+        return True
+    # Check if username matches (case-insensitive)
+    if uname and uname in [x.lower() for x in owners]:
+        print(f"DEBUG: {uname} recognized as owner by username.")
+        return True
+    return False
 
-def is_admin(telegram_id):
-    # Directly compare the Telegram ID with the ones in config.OWNERS or config.ADMINS
-    return telegram_id in config.OWNERS or telegram_id in config.ADMINS
+def is_admin(user_obj):
+    """
+    Checks if the user is an admin.
+    Supports matching by Telegram ID or by username (case-insensitive).
+    Owners are considered admins as well.
+    """
+    if is_owner(user_obj):
+        return True
+    if not user_obj:
+        return False
+    tid = str(user_obj.id)
+    uname = user_obj.username.lower() if user_obj.username else ""
+    admins = config.ADMINS
+    if tid in admins:
+        print(f"DEBUG: {tid} recognized as admin by ID.")
+        return True
+    if uname and uname in [x.lower() for x in admins]:
+        print(f"DEBUG: {uname} recognized as admin by username.")
+        return True
+    return False
 
 def send_admin_menu(bot, message):
-    telegram_id = str(message.from_user.id)
-    if not is_admin(telegram_id):
+    user_obj = message.from_user
+    if not is_admin(user_obj):
         bot.send_message(message.chat.id, "🚫 <b>Access prohibited!</b>", parse_mode="HTML")
         return
     markup = types.InlineKeyboardMarkup(row_width=2)
-    if is_owner(telegram_id):
+    if is_owner(user_obj):
         markup.add(
             types.InlineKeyboardButton("📺 Platform Mgmt", callback_data="admin_platform"),
             types.InlineKeyboardButton("📈 Stock Mgmt", callback_data="admin_stock"),
@@ -247,9 +280,6 @@ def process_admin_notify(message):
     bot_instance.send_message(message.chat.id, "✅ <b>Notification sent to all verification channels.</b>", parse_mode="HTML")
     send_admin_menu(bot_instance, message)
 
-# ----------------------
-# Callback Router for Admin Commands
-# ----------------------
 def admin_callback_handler(bot, call):
     data = call.data
     if data == "admin_platform":
