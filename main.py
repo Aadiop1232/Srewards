@@ -10,6 +10,7 @@ from handlers.rewards import send_rewards_menu, handle_platform_selection, claim
 from handlers.account_info import send_account_info
 from handlers.review import prompt_review
 from handlers.admin import send_admin_menu, admin_callback_handler, is_admin, generate_normal_key, generate_premium_key, add_key
+import sys
 
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
 init_db()
@@ -175,9 +176,8 @@ def callback_claim(call):
 
 @bot.callback_query_handler(func=lambda call: call.data == "menu_account")
 def callback_menu_account(call):
-    # Use the callback query object directly so that send_account_info uses call.from_user
     send_account_info(bot, call)
-
+    
 @bot.callback_query_handler(func=lambda call: call.data == "menu_referral")
 def callback_menu_referral(call):
     send_referral_menu(bot, call.message)
