@@ -41,49 +41,44 @@ def send_rewards_menu(bot, message):
     platforms = get_platforms()
     markup = types.InlineKeyboardMarkup(row_width=2)
     if not platforms:
-        bot.send_message(message.chat.id, "😢 No platforms available at the moment.")
+        bot.send_message(message.chat.id, "😢 <b>No platforms available.</b>", parse_mode="HTML")
         return
     for platform in platforms:
         markup.add(types.InlineKeyboardButton(f"📺 {platform}", callback_data=f"reward_{platform}"))
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
-    try:
-        bot.edit_message_text("🎯 *Available Platforms* 🎯", chat_id=message.chat.id,
-                              message_id=message.message_id, parse_mode="Markdown", reply_markup=markup)
-    except Exception:
-        bot.send_message(message.chat.id, "🎯 *Available Platforms* 🎯", parse_mode="Markdown", reply_markup=markup)
+    bot.send_message(message.chat.id, "<b>🎯 Available Platforms 🎯</b>", parse_mode="HTML", reply_markup=markup)
 
 def handle_platform_selection(bot, call, platform):
     stock = get_stock_for_platform(platform)
     if stock:
-        text = f"📺 *{platform}*:\n✅ *{len(stock)} accounts available!*"
+        text = f"<b>📺 {platform}</b>\n✅ {len(stock)} accounts available!"
         markup = types.InlineKeyboardMarkup(row_width=1)
         markup.add(types.InlineKeyboardButton("🎁 Claim Account", callback_data=f"claim_{platform}"))
     else:
-        text = f"📺 *{platform}*:\n😞 No accounts available at the moment."
+        text = f"<b>📺 {platform}</b>\n😞 No accounts available."
         markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="menu_rewards"))
-    bot.edit_message_text(text, chat_id=call.message.chat.id,
-                          message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
+    bot.send_message(call.message.chat.id, text, parse_mode="HTML", reply_markup=markup)
 
 def claim_account(bot, call, platform):
     telegram_id = str(call.from_user.id)
     user = get_user(telegram_id)
-    if user is None:
+    if not user:
         bot.answer_callback_query(call.id, "User not found.")
         return
-    current_points = user[4]  # points field (assuming schema: telegram_id, internal_id, username, join_date, points, referrals, banned, pending_referrer)
+    current_points = user[3]
     if current_points < 2:
-        bot.answer_callback_query(call.id, "Insufficient points (each claim costs 2 points). Earn more by referring or redeeming a key.")
+        bot.answer_callback_query(call.id, "Insufficient points.")
         return
     stock = get_stock_for_platform(platform)
     if not stock:
-        bot.answer_callback_query(call.id, "😞 No accounts available.")
+        bot.answer_callback_query(call.id, "No accounts available.")
         return
-    index = random.randint(0, len(stock) - 1)
+    index = random.randint(0, len(stock)-1)
     account = stock.pop(index)
     update_stock_for_platform(platform, stock)
     new_points = current_points - 2
     update_user_points(telegram_id, new_points)
-    bot.answer_callback_query(call.id, "🎉 Account claimed!")
-    bot.send_message(call.message.chat.id, f"💳 *Your account for {platform}:*\n`{account}`\nRemaining points: {new_points}", parse_mode="Markdown")
-                         
+    bot.answer_callback_query(call.id, "Account claimed!")
+    bot.send_message(call.message.chat.id, f"<b>Your account for {platform}:</b>\n<code>{account}</code>\nRemaining points: {new_points}", parse_mode="HTML")
+    
