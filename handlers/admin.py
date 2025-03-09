@@ -238,8 +238,7 @@ def is_admin(user_or_id):
 
 def send_admin_menu(bot, message):
     """
-    Displays the admin menu.
-    Since only admins/owners see the Admin Panel button in the main menu,
+    Displays the admin menu. Since only admins/owners see the Admin Panel button in the main menu,
     we assume this function is called only by authorized users.
     """
     markup = types.InlineKeyboardMarkup(row_width=2)
@@ -260,6 +259,63 @@ def send_admin_menu(bot, message):
     markup.add(types.InlineKeyboardButton("📢 Notify", callback_data="admin_notify"))
     markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
     bot.send_message(message.chat.id, "<b>🛠 Admin Panel</b> 🛠", parse_mode="HTML", reply_markup=markup)
+
+def admin_callback_handler(bot, call):
+    data = call.data
+    # Check admin privileges here; if not admin, do nothing.
+    if not is_admin(call.from_user):
+        bot.answer_callback_query(call.id, "Access prohibited.")
+        return
+    if data == "admin_platform":
+        handle_admin_platform(bot, call)
+    elif data == "admin_platform_add":
+        handle_admin_platform_add(bot, call)
+    elif data == "admin_platform_remove":
+        handle_admin_platform_remove(bot, call)
+    elif data.startswith("admin_platform_rm_"):
+        platform = data.split("admin_platform_rm_")[1]
+        handle_admin_platform_rm(bot, call, platform)
+    elif data == "admin_stock":
+        handle_admin_stock(bot, call)
+    elif data.startswith("admin_stock_"):
+        platform = data.split("admin_stock_")[1]
+        handle_admin_stock_platform(bot, call, platform)
+    elif data == "admin_channel":
+        handle_admin_channel(bot, call)
+    elif data == "admin_channel_add":
+        handle_admin_channel_add(bot, call)
+    elif data == "admin_channel_remove":
+        handle_admin_channel_remove(bot, call)
+    elif data.startswith("admin_channel_rm_"):
+        channel_id = data.split("admin_channel_rm_")[1]
+        handle_admin_channel_rm(bot, call, channel_id)
+    elif data == "admin_manage":
+        handle_admin_manage(bot, call)
+    elif data == "admin_list":
+        handle_admin_list(bot, call)
+    elif data == "admin_ban_unban":
+        handle_admin_ban_unban(bot, call)
+    elif data == "admin_remove":
+        handle_admin_remove(bot, call)
+    elif data == "admin_add":
+        handle_admin_add(bot, call)
+    elif data == "admin_add_owner":
+        handle_admin_add_owner(bot, call)
+    elif data == "admin_logs":
+        bot.answer_callback_query(call.id, "Admin logs not implemented.")
+    elif data == "admin_users":
+        bot.answer_callback_query(call.id, "User management not implemented.")
+    elif data == "user_ban_unban":
+        handle_user_ban_unban(bot, call)
+    elif data == "admin_keys":
+        handle_admin_keys(bot, call)
+    elif data == "admin_notify":
+        handle_admin_notify(bot, call)
+    elif data == "back_main":
+        from handlers.main_menu import send_main_menu
+        send_main_menu(bot, call.message)
+    else:
+        bot.answer_callback_query(call.id, "❓ Unknown admin command.")
 
 ###############################
 # PLATFORM SUB-HANDLERS
@@ -329,7 +385,9 @@ def process_stock_upload(message, platform):
     data = message.text.strip()
     accounts = [line.strip() for line in data.splitlines() if line.strip()]
     add_stock_to_platform(platform, accounts)
-    message.bot.send_message(message.chat.id, f"✅ Stock for <b>{platform}</b> updated with {len(accounts)} accounts.", parse_mode="HTML")
+    message.bot.send_message(message.chat.id,
+                              f"✅ Stock for <b>{platform}</b> updated with {len(accounts)} accounts.",
+                              parse_mode="HTML")
     send_admin_menu(message.bot, message)
 
 ###############################
@@ -510,4 +568,3 @@ def handle_admin_keys(bot, call):
             text += f"• {k[0]} | {k[1]} | Points: {k[2]} | Claimed: {k[3]} | By: {k[4]}\n"
     bot.edit_message_text(text, chat_id=call.message.chat.id,
                           message_id=call.message.message_id, parse_mode="HTML")
-    
