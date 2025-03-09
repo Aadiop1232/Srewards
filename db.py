@@ -96,5 +96,80 @@ def get_user(telegram_id):
     conn.close()
     return user
 
-# Keep other functions same as previous version
-# ... [rest of your existing db.py functions] ...
+def update_user_pending_referral(telegram_id, pending_referrer):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("UPDATE users SET pending_referrer=? WHERE telegram_id=?", (pending_referrer, telegram_id))
+    conn.commit()
+    conn.close()
+
+def clear_pending_referral(telegram_id):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("UPDATE users SET pending_referrer=NULL WHERE telegram_id=?", (telegram_id,))
+    conn.commit()
+    conn.close()
+
+def add_referral(referrer_id, referred_id):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT * FROM referrals WHERE referred_id=?", (referred_id,))
+    if c.fetchone():
+        conn.close()
+        return
+    c.execute("INSERT INTO referrals (user_id, referred_id) VALUES (?, ?)", (referrer_id, referred_id))
+    c.execute("UPDATE users SET points = points + 4, referrals = referrals + 1 WHERE telegram_id=?", (referrer_id,))
+    conn.commit()
+    conn.close()
+
+def add_review(user_id, review):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("INSERT INTO reviews (user_id, review) VALUES (?, ?)", (user_id, review))
+    conn.commit()
+    conn.close()
+
+def log_admin_action(admin_id, action):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("INSERT INTO admin_logs (admin_id, action) VALUES (?, ?)", (admin_id, action))
+    conn.commit()
+    conn.close()
+
+def get_key(key):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT key, type, points, claimed FROM keys WHERE key=?", (key,))
+    result = c.fetchone()
+    conn.close()
+    return result
+
+def claim_key_in_db(key, telegram_id):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT claimed, type, points FROM keys WHERE key=?", (key,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        return "Key not found."
+    if row[0] != 0:
+        conn.close()
+        return "Key already claimed."
+    points = row[2]
+    c.execute("UPDATE keys SET claimed=1, claimed_by=? WHERE key=?", (telegram_id, key))
+    c.execute("UPDATE users SET points = points + ? WHERE telegram_id=?", (points, telegram_id))
+    conn.commit()
+    conn.close()
+    return f"Key redeemed successfully. You've been awarded {points} points."
+
+def update_user_points(telegram_id, points):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("UPDATE users SET points=? WHERE telegram_id=?", (points, telegram_id))
+    conn.commit()
+    conn.close()
+
+if __name__ == '__main__':
+    init_db()
+    print("✅ Database initialized!")
+
