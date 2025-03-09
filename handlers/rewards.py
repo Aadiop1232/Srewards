@@ -72,7 +72,7 @@ def claim_account(bot, call, platform):
     if user is None:
         bot.answer_callback_query(call.id, "User not found.")
         return
-    current_points = user[3]  # points field (ensure your users table sets new users to 20 points)
+    current_points = user[3]  # points field
     if current_points < 2:
         bot.answer_callback_query(call.id, "Insufficient points (each account costs 2 points). Earn more by referring or redeeming a key.")
         return
@@ -91,7 +91,7 @@ def claim_account(bot, call, platform):
                      parse_mode="HTML")
 
 def process_stock_upload(bot, message, platform):
-    # Check if a document (TXT file) is attached
+    # If a document (.txt file) is attached, download its content.
     if message.content_type == "document":
         try:
             file_info = bot.get_file(message.document.file_id)
@@ -102,13 +102,19 @@ def process_stock_upload(bot, message, platform):
             return
     else:
         data = message.text.strip()
-    # Split the text into account blocks separated by one or more blank lines.
-    accounts = [block.strip() for block in re.split(r'\n\s*\n', data) if block.strip()]
+
+    # Use a regex to capture account blocks.
+    # The pattern matches text that starts with an email address (at the beginning of a line)
+    # and captures everything until the next line that starts with an email or the end of the text.
+    pattern = r"(^[\w\.-]+@[\w\.-]+\.\w+.*?)(?=^[\w\.-]+@[\w\.-]+\.\w+|\Z)"
+    accounts = re.findall(pattern, data, flags=re.M|re.S)
+    if not accounts:
+        # If no matches, treat the entire text as one account.
+        accounts = [data]
     update_stock_for_platform(platform, accounts)
     bot.send_message(message.chat.id,
                      f"✅ Stock for <b>{platform}</b> updated with {len(accounts)} accounts.",
                      parse_mode="HTML")
-    # Return to the admin menu
     from handlers.admin import send_admin_menu
     send_admin_menu(bot, message)
     
