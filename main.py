@@ -10,7 +10,6 @@ from handlers.rewards import send_rewards_menu, handle_platform_selection, claim
 from handlers.account_info import send_account_info
 from handlers.review import prompt_review
 from handlers.admin import send_admin_menu, admin_callback_handler, is_admin, generate_normal_key, generate_premium_key, add_key
-import sys
 
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
 init_db()
@@ -32,7 +31,6 @@ def start_command(message):
 
 @bot.message_handler(commands=["gen"])
 def gen_command(message):
-    telegram_id = str(message.from_user.id)
     if not is_admin(message.from_user):
         bot.reply_to(message, "🚫 You do not have permission to generate keys.")
         return
@@ -87,7 +85,7 @@ def lend_command(message):
     if len(parts) < 3:
         bot.reply_to(message, "Usage: /lend <userid> <points>")
         return
-    target_internal_id = parts[1].strip()
+    target_id = parts[1].strip()
     try:
         pts = int(parts[2])
     except ValueError:
@@ -96,7 +94,7 @@ def lend_command(message):
     from db import get_user, update_user_points
     conn = __import__('sqlite3').connect(config.DATABASE)
     c = conn.cursor()
-    c.execute("SELECT telegram_id, internal_id, points FROM users WHERE internal_id=?", (target_internal_id,))
+    c.execute("SELECT telegram_id, username, points FROM users WHERE telegram_id=?", (target_id,))
     target = c.fetchone()
     conn.close()
     if target is None:
@@ -104,13 +102,12 @@ def lend_command(message):
         return
     new_points = target[2] + pts
     update_user_points(target[0], new_points)
-    bot.reply_to(message, f"✅ {pts} points added to {target_internal_id}. New balance: {new_points}")
+    bot.reply_to(message, f"✅ {pts} points added to {target_id}. New balance: {new_points}")
     for owner in config.OWNERS:
-        bot.send_message(owner, f"📣 {message.from_user.username} ({message.from_user.id}) lent {pts} points to {target_internal_id}.")
+        bot.send_message(owner, f"📣 {message.from_user.username} ({message.from_user.id}) lent {pts} points to {target_id}.")
 
 @bot.message_handler(commands=["notify"])
 def notify_command(message):
-    telegram_id = str(message.from_user.id)
     if not is_admin(message.from_user):
         bot.reply_to(message, "🚫 You do not have permission to use /notify.")
         return
@@ -129,7 +126,7 @@ def tutorial_command(message):
         "📖 <b>Tutorial</b>\n"
         "1. Every new user starts with 20 points (each account claim costs 2 points).\n"
         "2. To claim an account, go to the Rewards section. If you have at least 2 points, you can claim an account (2 points will be deducted).\n"
-        "3. Earn more points by referring friends (each referral gives 4 points) or redeeming keys (/redeem &lt;key&gt;).\n"
+        "3. Earn more points by referring friends (each referral gives 4 points) or redeeming keys (/redeem <key>).\n"
         "4. Admins/Owners can generate keys using /gen and lend points using /lend.\n"
         "5. Use /notify to broadcast a message to all owners/admins.\n"
         "6. Your account info always shows your real-time balance and referral count (using your Telegram User ID).\n"
@@ -194,4 +191,4 @@ def callback_verify(call):
     process_verified_referral(call.from_user.id)
 
 bot.polling(none_stop=True)
-                                     
+            
