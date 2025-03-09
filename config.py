@@ -1,8 +1,9 @@
 # config.py
-TOKEN = "7760154469:AAHXLYuSgHHWpP9TVUm-bPiy0wBI0U_wHTg"
+TOKEN = "7760154469:AAFMteXwMHZU27J0aCqlUjqgaheZaJf6T9w"
 BOT_USERNAME = "ShadowRewardsBot"
-OWNERS = ["7218606355", "38461874"]
-ADMINS = ["7218606355", "38461874"]
+# You can mix numeric IDs and usernames (usernames without '@')
+OWNERS = ["7218606355", "MrLazyOp"]
+ADMINS = ["7218606355", "yourusername", "38461874"]
 REQUIRED_CHANNELS = [
     "https://t.me/shadowsquad0",
     "https://t.me/Originlabs",
