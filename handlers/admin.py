@@ -144,7 +144,7 @@ def unban_user(user_id):
     conn.close()
 
 ###############################
-# KEYS MANAGEMENT FUNCTIONS (for /gen and /redeem)
+# KEYS MANAGEMENT FUNCTIONS
 ###############################
 def generate_normal_key():
     return "NKEY-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
@@ -196,10 +196,6 @@ def update_user_points(user_id, points):
 # ADMIN PANEL HANDLERS & SECURITY
 ###############################
 def is_owner(user_or_id):
-    """
-    Returns True if the given user (object or raw ID) matches an entry in config.OWNERS.
-    Also supports matching by username (case-insensitive).
-    """
     if user_or_id is None:
         return False
     try:
@@ -215,10 +211,6 @@ def is_owner(user_or_id):
     return False
 
 def is_admin(user_or_id):
-    """
-    Returns True if the given user (object or raw ID) is recognized as an admin by config.ADMINS or is an owner.
-    Supports matching by Telegram ID or username.
-    """
     if is_owner(user_or_id):
         return True
     if user_or_id is None:
@@ -236,11 +228,6 @@ def is_admin(user_or_id):
     return False
 
 def send_admin_menu(bot, message):
-    """
-    Displays the admin menu.
-    Only admins/owners should be able to access this.
-    (In your main menu, the Admin Panel button is only shown to admins/owners.)
-    """
     markup = types.InlineKeyboardMarkup(row_width=2)
     if is_owner(message.from_user):
         markup.add(
@@ -319,29 +306,49 @@ def handle_admin_stock(bot, call):
     bot.edit_message_text("<b>📈 Select a platform to add stock:</b>", chat_id=call.message.chat.id,
                           message_id=call.message.message_id, parse_mode="HTML", reply_markup=markup)
 
+# Updated stock uploading handler with full capture logic.
 def handle_admin_stock_platform(bot, call, platform):
-    msg = bot.send_message(call.message.chat.id, f"✏️ <b>Send the stock text for platform {platform}:</b>\n(You can type or attach a .txt file)", parse_mode="HTML")
-    bot.register_next_step_handler(msg, lambda m: process_stock_upload(bot, m, platform))
+    msg = bot.send_message(call.message.chat.id, f"✏️ <b>Send the stock text for platform {platform}:</b>\n(You can either type or attach a .txt file)", parse_mode="Markdown")
+    bot.register_next_step_handler(msg, process_stock_upload, platform)
 
-def process_stock_upload(bot, message, platform):
+def process_stock_upload(message, platform):
+    """
+    Process uploaded stock data.
+    Accepts a text message or a document (.txt file).
+    Uses a regex to detect lines starting with an email address.
+    Lines that do not start with an email are appended to the previous account entry.
+    """
+    bot_instance = telebot.TeleBot(config.TOKEN)
     if message.content_type == "document":
+        file_info = bot_instance.get_file(message.document.file_id)
+        downloaded_file = bot_instance.download_file(file_info.file_path)
         try:
-            file_info = bot.get_file(message.document.file_id)
-            downloaded_file = bot.download_file(file_info.file_path)
             data = downloaded_file.decode('utf-8')
         except Exception as e:
-            bot.send_message(message.chat.id, f"❌ Error downloading file: {e}", parse_mode="HTML")
+            bot_instance.send_message(message.chat.id, f"❌ Error decoding file: {e}", parse_mode="Markdown")
             return
     else:
         data = message.text.strip()
-    # Use a regex to split the text into blocks separated by one or more blank lines.
-    import re
-    accounts = [block.strip() for block in re.split(r'\n\s*\n', data) if block.strip()]
+    email_pattern = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+")
+    accounts = []
+    current_account = ""
+    for line in data.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if email_pattern.match(line):
+            if current_account:
+                accounts.append(current_account.strip())
+            current_account = line
+        else:
+            current_account += " " + line
+    if current_account:
+        accounts.append(current_account.strip())
     add_stock_to_platform(platform, accounts)
-    bot.send_message(message.chat.id,
-                     f"✅ Stock for <b>{platform}</b> updated with {len(accounts)} accounts.",
-                     parse_mode="HTML")
-    send_admin_menu(bot, message)
+    bot_instance.send_message(message.chat.id,
+                              f"✅ Stock for *{platform}* updated with {len(accounts)} accounts.",
+                              parse_mode="Markdown")
+    send_admin_menu(bot_instance, message)
 
 ###############################
 # CHANNEL SUB-HANDLERS (Owners Only)
@@ -363,7 +370,7 @@ def handle_admin_channel_add(bot, call):
     if not is_owner(call.from_user.id):
         bot.answer_callback_query(call.id, "🚫 Access prohibited.")
         return
-    msg = bot.send_message(call.message.chat.id, "✏️ <b>Send the channel link to add:</b>", parse_mode="HTML")
+    msg = bot.send_message(call.message.chat.id, "✏️ <b>Send the channel link to add:</b>", parse_mode="Markdown")
     bot.register_next_step_handler(msg, lambda m: process_channel_add(bot, m))
 
 def process_channel_add(bot, message):
@@ -374,10 +381,10 @@ def process_channel_add(bot, message):
         c.execute("INSERT INTO channels (channel_link) VALUES (?)", (channel_link,))
         conn.commit()
         conn.close()
-        response = f"✅ Channel <b>{channel_link}</b> added successfully."
+        response = f"✅ Channel *{channel_link}* added successfully."
     except Exception as e:
         response = f"❌ Error adding channel: {e}"
-    bot.send_message(message.chat.id, response, parse_mode="HTML")
+    bot.send_message(message.chat.id, response, parse_mode="Markdown")
     send_admin_menu(bot, message)
 
 def handle_admin_channel_remove(bot, call):
@@ -393,7 +400,7 @@ def handle_admin_channel_remove(bot, call):
         markup.add(types.InlineKeyboardButton(link, callback_data=f"admin_channel_rm_{cid}"))
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_channel"))
     bot.edit_message_text("<b>🔗 Select a channel to remove:</b>", chat_id=call.message.chat.id,
-                          message_id=call.message.message_id, parse_mode="HTML", reply_markup=markup)
+                          message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
 def handle_admin_channel_rm(bot, call, channel_id):
     remove_channel(channel_id)
@@ -421,7 +428,7 @@ def handle_admin_manage(bot, call):
     )
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
     bot.edit_message_text("<b>👥 Admin Management</b>", chat_id=call.message.chat.id,
-                          message_id=call.message.message_id, parse_mode="HTML", reply_markup=markup)
+                          message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
 def handle_admin_list(bot, call):
     admins = get_admins()
@@ -430,12 +437,12 @@ def handle_admin_list(bot, call):
     else:
         text = "<b>👥 Admins:</b>\n"
         for admin in admins:
-            text += f"• ID: {admin[0]}, Username: {admin[1]}, Role: {admin[2]}, Banned: {admin[3]}\n"
+            text += f"• *UserID:* {admin[0]}, *Username:* {admin[1]}, *Role:* {admin[2]}, *Banned:* {admin[3]}\n"
     bot.edit_message_text(text, chat_id=call.message.chat.id,
-                          message_id=call.message.message_id, parse_mode="HTML")
+                          message_id=call.message.message_id, parse_mode="Markdown")
 
 def handle_admin_ban_unban(bot, call):
-    msg = bot.send_message(call.message.chat.id, "✏️ <b>Send the admin Telegram ID to ban/unban:</b>", parse_mode="HTML")
+    msg = bot.send_message(call.message.chat.id, "✏️ <b>Send the admin UserID to ban/unban:</b>", parse_mode="Markdown")
     bot.register_next_step_handler(msg, lambda m: process_admin_ban_unban(bot, m))
 
 def process_admin_ban_unban(bot, message):
@@ -454,25 +461,25 @@ def process_admin_ban_unban(bot, message):
             unban_admin(user_id)
             response = f"✅ Admin {user_id} has been unbanned."
     conn.close()
-    bot.send_message(message.chat.id, response, parse_mode="HTML")
+    bot.send_message(message.chat.id, response, parse_mode="Markdown")
     send_admin_menu(bot, message)
 
 def handle_admin_remove(bot, call):
-    msg = bot.send_message(call.message.chat.id, "✏️ <b>Send the admin Telegram ID to remove:</b>", parse_mode="HTML")
+    msg = bot.send_message(call.message.chat.id, "✏️ <b>Send the admin UserID to remove:</b>", parse_mode="Markdown")
     bot.register_next_step_handler(msg, lambda m: process_admin_remove(bot, m))
 
 def process_admin_remove(bot, message):
     user_id = message.text.strip()
     remove_admin(user_id)
     response = f"✅ Admin {user_id} removed."
-    bot.send_message(message.chat.id, response, parse_mode="HTML")
+    bot.send_message(message.chat.id, response, parse_mode="Markdown")
     send_admin_menu(bot, message)
 
 def handle_admin_add(bot, call):
     if not is_owner(call.from_user.id):
         bot.answer_callback_query(call.id, "🚫 Access prohibited. Only owners can add admins.")
         return
-    msg = bot.send_message(call.message.chat.id, "✏️ <b>Send the UserID and Username (separated by a space) to add as admin:</b>", parse_mode="HTML")
+    msg = bot.send_message(call.message.chat.id, "✏️ <b>Send the UserID and Username (separated by a space) to add as admin:</b>", parse_mode="Markdown")
     bot.register_next_step_handler(msg, lambda m: process_admin_add(bot, m))
 
 def process_admin_add(bot, message):
@@ -483,28 +490,28 @@ def process_admin_add(bot, message):
         user_id, username = parts[0], " ".join(parts[1:])
         add_admin(user_id, username, role="admin")
         response = f"✅ Admin {user_id} added with username {username}."
-    bot.send_message(message.chat.id, response, parse_mode="HTML")
+    bot.send_message(message.chat.id, response, parse_mode="Markdown")
     send_admin_menu(bot, message)
 
 def handle_admin_add_owner(bot, call):
     if not is_owner(call.from_user.id):
         bot.answer_callback_query(call.id, "🚫 Access prohibited. Only owners can add owners.")
         return
-    msg = bot.send_message(call.message.chat.id, "✏️ <b>Send the Telegram ID to add as owner:</b>", parse_mode="HTML")
+    msg = bot.send_message(call.message.chat.id, "✏️ <b>Send the Telegram ID to add as owner:</b>", parse_mode="Markdown")
     bot.register_next_step_handler(msg, lambda m: process_admin_add_owner(bot, m))
 
 def process_admin_add_owner(bot, message):
     user_id = message.text.strip()
     add_admin(user_id, "Owner", role="owner")
     response = f"👑 Telegram ID {user_id} added as owner."
-    bot.send_message(message.chat.id, response, parse_mode="HTML")
+    bot.send_message(message.chat.id, response, parse_mode="Markdown")
     send_admin_menu(bot, message)
 
 ###############################
 # USER MANAGEMENT SUB-HANDLERS
 ###############################
 def handle_user_ban_unban(bot, call):
-    msg = bot.send_message(call.message.chat.id, "✏️ <b>Send the Telegram ID to ban/unban:</b>", parse_mode="HTML")
+    msg = bot.send_message(call.message.chat.id, "✏️ <b>Send the Telegram ID to ban/unban:</b>", parse_mode="Markdown")
     bot.register_next_step_handler(msg, lambda m: process_user_ban_unban(bot, m))
 
 def process_user_ban_unban(bot, message):
@@ -523,7 +530,7 @@ def process_user_ban_unban(bot, message):
             unban_user(user_id)
             response = f"✅ User {user_id} has been unbanned."
     conn.close()
-    bot.send_message(message.chat.id, response, parse_mode="HTML")
+    bot.send_message(message.chat.id, response, parse_mode="Markdown")
     send_admin_menu(bot, message)
 
 ###############################
@@ -538,28 +545,31 @@ def handle_admin_keys(bot, call):
         for k in keys:
             text += f"• {k[0]} | {k[1]} | Points: {k[2]} | Claimed: {k[3]} | By: {k[4]}\n"
     bot.edit_message_text(text, chat_id=call.message.chat.id,
-                          message_id=call.message.message_id, parse_mode="HTML")
+                          message_id=call.message.message_id, parse_mode="Markdown")
 
 def handle_admin_notify(bot, call):
-    msg = bot.send_message(call.message.chat.id, "✏️ <b>Enter notification text to send to all verification channels:</b>", parse_mode="HTML")
+    msg = bot.send_message(call.message.chat.id, "✏️ <b>Enter notification text to send to all verification channels:</b>", parse_mode="Markdown")
     bot.register_next_step_handler(msg, lambda m: process_admin_notify(bot, m))
 
 def process_admin_notify(bot, message):
     notify_text = message.text.strip()
     if not notify_text:
-        bot.send_message(message.chat.id, "🚫 <b>Notification text cannot be empty.</b>", parse_mode="HTML")
+        bot.send_message(message.chat.id, "🚫 <b>Notification text cannot be empty.</b>", parse_mode="Markdown")
         return
     formatted = f"<b>Notification:</b>\n\n{notify_text}"
     bot_instance = telebot.TeleBot(config.TOKEN)
     for channel in config.REQUIRED_CHANNELS:
         try:
             channel_username = channel.rstrip('/').split("/")[-1]
-            bot_instance.send_message("@" + channel_username, formatted, parse_mode="HTML")
+            bot_instance.send_message("@" + channel_username, formatted, parse_mode="Markdown")
         except Exception as e:
             print(f"Error sending notification to {channel}: {e}")
-    bot_instance.send_message(message.chat.id, "✅ <b>Notification sent to all verification channels.</b>", parse_mode="HTML")
+    bot_instance.send_message(message.chat.id, "✅ <b>Notification sent to all verification channels.</b>", parse_mode="Markdown")
     send_admin_menu(bot_instance, message)
 
+###############################
+# CALLBACK ROUTER
+###############################
 def admin_callback_handler(bot, call):
     data = call.data
     if not is_admin(call.from_user):
