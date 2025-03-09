@@ -92,7 +92,7 @@ def get_admins():
 def add_admin(user_id, username, role="admin"):
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("INSERT OR REPLACE INTO admins (user_id, username, role, banned) VALUES (?, ?, ?, 0)", 
+    c.execute("INSERT OR REPLACE INTO admins (user_id, username, role, banned) VALUES (?, ?, ?, 0)",
               (str(user_id), username, role))
     conn.commit()
     conn.close()
@@ -197,42 +197,42 @@ def update_user_points(telegram_id, points):
 # ----------------------
 def is_owner(user_obj):
     """
-    Checks if the user is an owner.
-    Supports matching either by Telegram ID or by username (case-insensitive).
+    Returns True if the given user (object or raw ID) is an owner.
+    Supports both user objects and raw IDs.
+    Also supports matching by username (case-insensitive).
     """
-    if not user_obj:
-        return False
-    tid = str(user_obj.id)
-    uname = user_obj.username.lower() if user_obj.username else ""
-    owners = config.OWNERS
-    # Check if Telegram ID matches
-    if tid in owners:
-        print(f"DEBUG: {tid} recognized as owner by ID.")
-        return True
-    # Check if username matches (case-insensitive)
-    if uname and uname in [x.lower() for x in owners]:
-        print(f"DEBUG: {uname} recognized as owner by username.")
+    try:
+        # If user_obj is an object with an id attribute
+        tid = str(user_obj.id)
+        uname = user_obj.username.lower() if user_obj.username else ""
+    except AttributeError:
+        # Otherwise, assume user_obj is a raw Telegram ID (string or int)
+        tid = str(user_obj)
+        uname = ""
+    # Check by Telegram ID or username
+    owners = [x.lower() for x in config.OWNERS]
+    if tid.lower() in owners or uname in owners:
+        print(f"DEBUG: {tid} or {uname} recognized as owner.")
         return True
     return False
 
 def is_admin(user_obj):
     """
-    Checks if the user is an admin.
-    Supports matching by Telegram ID or by username (case-insensitive).
-    Owners are considered admins as well.
+    Returns True if the given user (object or raw ID) is an admin.
+    Supports both user objects and raw IDs, and matches by Telegram ID or username.
+    Owners are also considered admins.
     """
     if is_owner(user_obj):
         return True
-    if not user_obj:
-        return False
-    tid = str(user_obj.id)
-    uname = user_obj.username.lower() if user_obj.username else ""
-    admins = config.ADMINS
-    if tid in admins:
-        print(f"DEBUG: {tid} recognized as admin by ID.")
-        return True
-    if uname and uname in [x.lower() for x in admins]:
-        print(f"DEBUG: {uname} recognized as admin by username.")
+    try:
+        tid = str(user_obj.id)
+        uname = user_obj.username.lower() if user_obj.username else ""
+    except AttributeError:
+        tid = str(user_obj)
+        uname = ""
+    admins = [x.lower() for x in config.ADMINS]
+    if tid.lower() in admins or uname in admins:
+        print(f"DEBUG: {tid} or {uname} recognized as admin.")
         return True
     return False
 
