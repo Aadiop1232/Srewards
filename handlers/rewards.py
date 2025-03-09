@@ -120,4 +120,4 @@ def process_stock_upload(bot, message, platform):
     # Return to the admin menu (assuming send_admin_menu is imported from admin.py)
     from handlers.admin import send_admin_menu
     send_admin_menu(bot, message)
-    
+                         
