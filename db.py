@@ -1,17 +1,15 @@
 # db.py
 import sqlite3
-import random
 
 DATABASE = "bot.db"
 
 def init_db():
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    # Create users table if it doesn't exist. Do NOT drop if exists.
+    # Users table: stores Telegram ID, username, join date, points, referrals, banned flag, pending_referrer
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             telegram_id TEXT PRIMARY KEY,
-            internal_id INTEGER UNIQUE,
             username TEXT,
             join_date TEXT,
             points INTEGER DEFAULT 20,
@@ -20,49 +18,56 @@ def init_db():
             pending_referrer TEXT
         )
     ''')
+    # Referrals table
     c.execute('''
         CREATE TABLE IF NOT EXISTS referrals (
-            user_id INTEGER,
-            referred_id INTEGER,
+            user_id TEXT,
+            referred_id TEXT,
             PRIMARY KEY (user_id, referred_id)
         )
     ''')
+    # Platforms table: platform name and JSON-encoded stock
     c.execute('''
         CREATE TABLE IF NOT EXISTS platforms (
             platform_name TEXT PRIMARY KEY,
             stock TEXT
         )
     ''')
+    # Reviews table
     c.execute('''
         CREATE TABLE IF NOT EXISTS reviews (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
+            user_id TEXT,
             review TEXT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    # Admin logs table
     c.execute('''
         CREATE TABLE IF NOT EXISTS admin_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            admin_id INTEGER,
+            admin_id TEXT,
             action TEXT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    # Channels table
     c.execute('''
         CREATE TABLE IF NOT EXISTS channels (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             channel_link TEXT
         )
     ''')
+    # Admins table
     c.execute('''
         CREATE TABLE IF NOT EXISTS admins (
-            user_id INTEGER PRIMARY KEY,
+            user_id TEXT PRIMARY KEY,
             username TEXT,
             role TEXT,
             banned INTEGER DEFAULT 0
         )
     ''')
+    # Keys table
     c.execute('''
         CREATE TABLE IF NOT EXISTS keys (
             key TEXT PRIMARY KEY,
@@ -76,26 +81,11 @@ def init_db():
     conn.commit()
     conn.close()
 
-def generate_internal_id():
-    """Generate a unique 8-digit number for internal_id."""
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    while True:
-        new_id = random.randint(10000000, 99999999)
-        c.execute("SELECT internal_id FROM users WHERE internal_id=?", (new_id,))
-        if not c.fetchone():
-            conn.close()
-            return new_id
-
 def add_user(telegram_id, username, join_date, pending_referrer=None):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    # Check if user already exists
-    c.execute("SELECT * FROM users WHERE telegram_id=?", (telegram_id,))
-    if not c.fetchone():
-        internal_id = generate_internal_id()
-        c.execute("INSERT INTO users (telegram_id, internal_id, username, join_date, pending_referrer) VALUES (?, ?, ?, ?, ?)",
-                  (telegram_id, internal_id, username, join_date, pending_referrer))
+    c.execute("INSERT OR IGNORE INTO users (telegram_id, username, join_date, pending_referrer) VALUES (?, ?, ?, ?)",
+              (telegram_id, username, join_date, pending_referrer))
     conn.commit()
     conn.close()
 
@@ -121,15 +111,15 @@ def clear_pending_referral(telegram_id):
     conn.commit()
     conn.close()
 
-def add_referral(referrer_internal_id, referred_internal_id):
+def add_referral(referrer_id, referred_id):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute("SELECT * FROM referrals WHERE referred_id=?", (referred_internal_id,))
+    c.execute("SELECT * FROM referrals WHERE referred_id=?", (referred_id,))
     if c.fetchone():
         conn.close()
         return
-    c.execute("INSERT INTO referrals (user_id, referred_id) VALUES (?, ?)", (referrer_internal_id, referred_internal_id))
-    c.execute("UPDATE users SET points = points + 4, referrals = referrals + 1 WHERE internal_id=?", (referrer_internal_id,))
+    c.execute("INSERT INTO referrals (user_id, referred_id) VALUES (?, ?)", (referrer_id, referred_id))
+    c.execute("UPDATE users SET points = points + 4, referrals = referrals + 1 WHERE telegram_id=?", (referrer_id,))
     conn.commit()
     conn.close()
 
