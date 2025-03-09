@@ -67,14 +67,14 @@ def handle_platform_selection(bot, call, platform):
                           message_id=call.message.message_id, parse_mode="HTML", reply_markup=markup)
 
 def claim_account(bot, call, platform):
-    telegram_id = str(call.from_user.id)
-    user = get_user(telegram_id)
+    user_id = str(call.from_user.id)
+    user = get_user(user_id)
     if user is None:
         bot.answer_callback_query(call.id, "User not found.")
         return
-    current_points = user[4]  # Assuming schema: telegram_id, username, join_date, points, referrals, ...
+    current_points = user[3]  # points field (ensure your users table sets new users to 20 points)
     if current_points < 2:
-        bot.answer_callback_query(call.id, "Insufficient points (each claim costs 2 points). Earn more by referring or redeeming a key.")
+        bot.answer_callback_query(call.id, "Insufficient points (each account costs 2 points). Earn more by referring or redeeming a key.")
         return
     stock = get_stock_for_platform(platform)
     if not stock:
@@ -84,13 +84,15 @@ def claim_account(bot, call, platform):
     account = stock.pop(index)
     update_stock_for_platform(platform, stock)
     new_points = current_points - 2
-    update_user_points(telegram_id, new_points)
+    update_user_points(user_id, new_points)
     bot.answer_callback_query(call.id, "🎉 Account claimed!")
-    bot.send_message(call.message.chat.id, f"<b>Your account for {platform}:</b>\n<code>{account}</code>\nRemaining points: {new_points}", parse_mode="HTML")
+    bot.send_message(call.message.chat.id,
+                     f"<b>Your account for {platform}:</b>\n<code>{account}</code>\nRemaining points: {new_points}",
+                     parse_mode="HTML")
 
 def process_stock_upload(bot, message, platform):
     # Check if a document (TXT file) is attached
-    if hasattr(message, 'document'):
+    if message.content_type == "document":
         try:
             file_info = bot.get_file(message.document.file_id)
             downloaded_file = bot.download_file(file_info.file_path)
@@ -100,13 +102,13 @@ def process_stock_upload(bot, message, platform):
             return
     else:
         data = message.text.strip()
-    
-    # Split the text into account blocks by one or more blank lines.
-    # This allows multi-line account captures.
+    # Split the text into account blocks separated by one or more blank lines.
     accounts = [block.strip() for block in re.split(r'\n\s*\n', data) if block.strip()]
     update_stock_for_platform(platform, accounts)
-    bot.send_message(message.chat.id, f"✅ Stock for <b>{platform}</b> updated with {len(accounts)} accounts.", parse_mode="HTML")
-    # Return to the admin menu or appropriate admin panel
+    bot.send_message(message.chat.id,
+                     f"✅ Stock for <b>{platform}</b> updated with {len(accounts)} accounts.",
+                     parse_mode="HTML")
+    # Return to the admin menu
     from handlers.admin import send_admin_menu
     send_admin_menu(bot, message)
-        
+    
