@@ -12,9 +12,8 @@ def extract_referral_code(message):
 
 def process_verified_referral(telegram_id):
     referred = get_user(str(telegram_id))
-    if referred and referred[7]:  # pending_referrer is at index 7 now
+    if referred and referred[7]:  # pending_referrer at index 7
         referrer_internal_id = referred[7]
-        # Add referral using internal IDs:
         add_referral(referrer_internal_id, referred[1])
         clear_pending_referral(str(telegram_id))
         notification = (
