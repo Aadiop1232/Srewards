@@ -2,24 +2,23 @@
 from db import get_user
 
 def send_account_info(bot, message):
-    user_id = str(message.from_user.id)
-    # Debug log to ensure unique IDs (remove or comment out in production)
-    print(f"DEBUG: Account info requested by user id: {user_id}")
-    user = get_user(user_id)
+    telegram_id = str(message.from_user.id)
+    user = get_user(telegram_id)
     if user:
+        # user tuple: (telegram_id, internal_id, username, join_date, points, referrals, banned, pending_referrer)
         text = (
             f"👤 *Account Info*\n"
-            f"• *Username:* {user[1]}\n"
-            f"• *User ID:* {user[0]}\n"
-            f"• *Join Date:* {user[2]}\n"
-            f"• *Balance:* {user[3]} points\n"
-            f"• *Total Referrals:* {user[4]}"
+            f"• *Username:* {user[2]}\n"
+            f"• *User ID:* {user[1]}\n"  # Display internal_id
+            f"• *Join Date:* {user[3]}\n"
+            f"• *Balance:* {user[4]} points\n"
+            f"• *Total Referrals:* {user[5]}"
         )
     else:
         text = (
             f"👤 *Account Info*\n"
             f"• *Username:* {message.from_user.username or message.from_user.first_name}\n"
-            f"• *User ID:* {user_id}\n"
+            f"• *User ID:* N/A\n"
             "• *Join Date:* N/A\n"
             "• *Balance:* 0 points\n"
             "• *Total Referrals:* 0"
