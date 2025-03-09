@@ -1,14 +1,17 @@
 # db.py
 import sqlite3
+import uuid
 
 DATABASE = "bot.db"
 
 def init_db():
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
+    # Store both telegram_id and an auto‑generated internal_id (UUID)
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            user_id TEXT PRIMARY KEY,
+            telegram_id TEXT PRIMARY KEY,
+            internal_id TEXT UNIQUE,
             username TEXT,
             join_date TEXT,
             points INTEGER DEFAULT 20,
@@ -73,45 +76,47 @@ def init_db():
     conn.commit()
     conn.close()
 
-def add_user(user_id, username, join_date, pending_referrer=None):
+def add_user(telegram_id, username, join_date, pending_referrer=None):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute("INSERT OR IGNORE INTO users (user_id, username, join_date, pending_referrer) VALUES (?, ?, ?, ?)",
-              (user_id, username, join_date, pending_referrer))
+    # Generate a new internal_id using uuid4
+    internal_id = str(uuid.uuid4())
+    c.execute("REPLACE INTO users (telegram_id, internal_id, username, join_date, pending_referrer) VALUES (?, ?, ?, ?, ?)",
+              (telegram_id, internal_id, username, join_date, pending_referrer))
     conn.commit()
     conn.close()
 
-def get_user(user_id):
+def get_user(telegram_id):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
+    c.execute("SELECT * FROM users WHERE telegram_id=?", (telegram_id,))
     user = c.fetchone()
     conn.close()
     return user
 
-def update_user_pending_referral(user_id, pending_referrer):
+def update_user_pending_referral(telegram_id, pending_referrer):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute("UPDATE users SET pending_referrer=? WHERE user_id=?", (pending_referrer, user_id))
+    c.execute("UPDATE users SET pending_referrer=? WHERE telegram_id=?", (pending_referrer, telegram_id))
     conn.commit()
     conn.close()
 
-def clear_pending_referral(user_id):
+def clear_pending_referral(telegram_id):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute("UPDATE users SET pending_referrer=NULL WHERE user_id=?", (user_id,))
+    c.execute("UPDATE users SET pending_referrer=NULL WHERE telegram_id=?", (telegram_id,))
     conn.commit()
     conn.close()
 
-def add_referral(referrer_id, referred_id):
+def add_referral(referrer_internal_id, referred_internal_id):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute("SELECT * FROM referrals WHERE referred_id=?", (referred_id,))
+    c.execute("SELECT * FROM referrals WHERE referred_id=?", (referred_internal_id,))
     if c.fetchone():
         conn.close()
         return
-    c.execute("INSERT INTO referrals (user_id, referred_id) VALUES (?, ?)", (referrer_id, referred_id))
-    c.execute("UPDATE users SET points = points + 4, referrals = referrals + 1 WHERE user_id=?", (referrer_id,))
+    c.execute("INSERT INTO referrals (user_id, referred_id) VALUES (?, ?)", (referrer_internal_id, referred_internal_id))
+    c.execute("UPDATE users SET points = points + 4, referrals = referrals + 1 WHERE internal_id=?", (referrer_internal_id,))
     conn.commit()
     conn.close()
 
@@ -137,7 +142,7 @@ def get_key(key):
     conn.close()
     return result
 
-def claim_key_in_db(key, user_id):
+def claim_key_in_db(key, telegram_id):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     c.execute("SELECT claimed, type, points FROM keys WHERE key=?", (key,))
@@ -149,16 +154,20 @@ def claim_key_in_db(key, user_id):
         conn.close()
         return "Key already claimed."
     points = row[2]
-    c.execute("UPDATE keys SET claimed=1, claimed_by=? WHERE key=?", (user_id, key))
-    c.execute("UPDATE users SET points = points + ? WHERE user_id=?", (points, user_id))
+    c.execute("UPDATE keys SET claimed=1, claimed_by=? WHERE key=?", (telegram_id, key))
+    c.execute("UPDATE users SET points = points + ? WHERE telegram_id=?", (points, telegram_id))
     conn.commit()
     conn.close()
     return f"Key redeemed successfully. You've been awarded {points} points."
 
-def update_user_points(user_id, points):
+def update_user_points(telegram_id, points):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute("UPDATE users SET points=? WHERE user_id=?", (points, user_id))
+    c.execute("UPDATE users SET points=? WHERE telegram_id=?", (points, telegram_id))
     conn.commit()
     conn.close()
+
+if __name__ == '__main__':
+    init_db()
+    print("✅ Database initialized!")
     
