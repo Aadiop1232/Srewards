@@ -4,7 +4,7 @@ BOT_USERNAME = "ShadowRewardsBot"  # Without the '@'
 
 # Hard-coded internal IDs for owners and admins.
 # After a user registers, check their internal_id from the database and update these lists accordingly.
-OWNERS = ["<7218606355>", "<38461874>"]
+OWNERS = ["7218606355", "38461874"]
 ADMINS = ["<admin_internal_id1>", "<admin_internal_id2>"]
 
 REQUIRED_CHANNELS = [
