@@ -12,28 +12,24 @@ def extract_referral_code(message):
 
 def process_verified_referral(telegram_id):
     referred = get_user(str(telegram_id))
-    if referred and referred[7]:  # pending_referrer at index 7
-        referrer_internal_id = referred[7]
-        add_referral(referrer_internal_id, referred[1])
+    # pending_referrer is stored in column index 6
+    if referred and referred[6]:
+        referrer_id = referred[6]
+        add_referral(referrer_id, referred[0])
         clear_pending_referral(str(telegram_id))
-        notification = (
-            f"🎉 *Referral Completed!*\n"
-            f"You have successfully referred {referred[2]} (Internal ID: {referred[1]}).\n"
-            f"You earned 4 points!"
-        )
         bot = telebot.TeleBot(config.TOKEN)
         try:
-            bot.send_message(referrer_internal_id, notification, parse_mode="Markdown")
+            bot.send_message(referrer_id, "<b>🎉 Referral completed!</b> You earned 4 points.", parse_mode="HTML")
         except Exception as e:
             print(f"Error notifying referrer: {e}")
 
 def send_referral_menu(bot, message):
     telegram_id = str(message.from_user.id)
-    text = f"🔗 *Referral System*\nYour referral link is available below."
+    text = "🔗 <b>Referral System 😁</b>\nYour referral link is below."
     markup = telebot.types.InlineKeyboardMarkup()
     markup.add(telebot.types.InlineKeyboardButton("🌟 Get Referral Link", callback_data="get_ref_link"))
     markup.add(telebot.types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
-    bot.send_message(message.chat.id, text, parse_mode="Markdown", reply_markup=markup)
+    bot.send_message(message.chat.id, text, parse_mode="HTML", reply_markup=markup)
 
 def get_referral_link(telegram_id):
     return f"https://t.me/{config.BOT_USERNAME}?start=ref_{telegram_id}"
