@@ -7,7 +7,6 @@ DATABASE = "bot.db"
 def init_db():
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    # Store both telegram_id and an auto‑generated internal_id (UUID)
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             telegram_id TEXT PRIMARY KEY,
@@ -79,7 +78,6 @@ def init_db():
 def add_user(telegram_id, username, join_date, pending_referrer=None):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    # Generate a new internal_id using uuid4
     internal_id = str(uuid.uuid4())
     c.execute("REPLACE INTO users (telegram_id, internal_id, username, join_date, pending_referrer) VALUES (?, ?, ?, ?, ?)",
               (telegram_id, internal_id, username, join_date, pending_referrer))
