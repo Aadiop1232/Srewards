@@ -73,7 +73,8 @@ def claim_account(bot, call, platform):
         bot.answer_callback_query(call.id, "User not found.")
         return
     try:
-        current_points = int(user[3])  # Convert points to integer
+        # Convert the points field to a number (using float first in case it's stored as a string like "20" or "20.0")
+        current_points = int(float(user[3]))
     except Exception:
         bot.answer_callback_query(call.id, "Error reading your points.")
         return
@@ -106,9 +107,9 @@ def process_stock_upload(bot, message, platform):
             return
     else:
         data = message.text.strip()
-    # Use regex to capture account blocks.
-    # The pattern finds text that starts with an email address and captures until the next email or the end of the text.
-    pattern = r"([\w\.-]+@[\w\.-]+\.\w+.*?)(?=[\w\.-]+@[\w\.-]+\.\w+|$)"
+    # Use a regex to capture account blocks.
+    # This pattern looks for blocks that start with an email address and lazily captures until the next email or end of text.
+    pattern = r"((?:[\w\.-]+@[\w\.-]+\.\w+).*?)(?=(?:[\w\.-]+@[\w\.-]+\.\w+)|$)"
     accounts = re.findall(pattern, data, flags=re.DOTALL)
     accounts = [acct.strip() for acct in accounts if acct.strip()]
     if not accounts:
@@ -117,7 +118,6 @@ def process_stock_upload(bot, message, platform):
     bot.send_message(message.chat.id,
                      f"✅ Stock for <b>{platform}</b> updated with {len(accounts)} accounts.",
                      parse_mode="HTML")
-    # Return to the admin menu (assuming send_admin_menu is imported from admin.py)
     from handlers.admin import send_admin_menu
     send_admin_menu(bot, message)
-                         
+        
