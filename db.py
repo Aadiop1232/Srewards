@@ -7,8 +7,18 @@ DATABASE = "bot.db"
 def init_db():
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
+    # Drop tables if they exist (destructive migration)
+    c.execute("DROP TABLE IF EXISTS users")
+    c.execute("DROP TABLE IF EXISTS referrals")
+    c.execute("DROP TABLE IF EXISTS platforms")
+    c.execute("DROP TABLE IF EXISTS reviews")
+    c.execute("DROP TABLE IF EXISTS admin_logs")
+    c.execute("DROP TABLE IF EXISTS channels")
+    c.execute("DROP TABLE IF EXISTS admins")
+    c.execute("DROP TABLE IF EXISTS keys")
+    # Create users table with both telegram_id and a generated internal_id
     c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
+        CREATE TABLE users (
             telegram_id TEXT PRIMARY KEY,
             internal_id TEXT UNIQUE,
             username TEXT,
@@ -20,20 +30,20 @@ def init_db():
         )
     ''')
     c.execute('''
-        CREATE TABLE IF NOT EXISTS referrals (
+        CREATE TABLE referrals (
             user_id TEXT,
             referred_id TEXT,
             PRIMARY KEY (user_id, referred_id)
         )
     ''')
     c.execute('''
-        CREATE TABLE IF NOT EXISTS platforms (
+        CREATE TABLE platforms (
             platform_name TEXT PRIMARY KEY,
             stock TEXT
         )
     ''')
     c.execute('''
-        CREATE TABLE IF NOT EXISTS reviews (
+        CREATE TABLE reviews (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT,
             review TEXT,
@@ -41,7 +51,7 @@ def init_db():
         )
     ''')
     c.execute('''
-        CREATE TABLE IF NOT EXISTS admin_logs (
+        CREATE TABLE admin_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             admin_id TEXT,
             action TEXT,
@@ -49,13 +59,13 @@ def init_db():
         )
     ''')
     c.execute('''
-        CREATE TABLE IF NOT EXISTS channels (
+        CREATE TABLE channels (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             channel_link TEXT
         )
     ''')
     c.execute('''
-        CREATE TABLE IF NOT EXISTS admins (
+        CREATE TABLE admins (
             user_id TEXT PRIMARY KEY,
             username TEXT,
             role TEXT,
@@ -63,7 +73,7 @@ def init_db():
         )
     ''')
     c.execute('''
-        CREATE TABLE IF NOT EXISTS keys (
+        CREATE TABLE keys (
             key TEXT PRIMARY KEY,
             type TEXT,
             points INTEGER,
