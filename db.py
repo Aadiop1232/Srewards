@@ -1,26 +1,17 @@
 # db.py
 import sqlite3
-import uuid
+import random
 
 DATABASE = "bot.db"
 
 def init_db():
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    # Drop tables if they exist (destructive migration)
-    c.execute("DROP TABLE IF EXISTS users")
-    c.execute("DROP TABLE IF EXISTS referrals")
-    c.execute("DROP TABLE IF EXISTS platforms")
-    c.execute("DROP TABLE IF EXISTS reviews")
-    c.execute("DROP TABLE IF EXISTS admin_logs")
-    c.execute("DROP TABLE IF EXISTS channels")
-    c.execute("DROP TABLE IF EXISTS admins")
-    c.execute("DROP TABLE IF EXISTS keys")
-    # Create users table with both telegram_id and a generated internal_id
+    # Create users table if it doesn't exist. Do NOT drop if exists.
     c.execute('''
-        CREATE TABLE users (
+        CREATE TABLE IF NOT EXISTS users (
             telegram_id TEXT PRIMARY KEY,
-            internal_id TEXT UNIQUE,
+            internal_id INTEGER UNIQUE,
             username TEXT,
             join_date TEXT,
             points INTEGER DEFAULT 20,
@@ -30,50 +21,50 @@ def init_db():
         )
     ''')
     c.execute('''
-        CREATE TABLE referrals (
-            user_id TEXT,
-            referred_id TEXT,
+        CREATE TABLE IF NOT EXISTS referrals (
+            user_id INTEGER,
+            referred_id INTEGER,
             PRIMARY KEY (user_id, referred_id)
         )
     ''')
     c.execute('''
-        CREATE TABLE platforms (
+        CREATE TABLE IF NOT EXISTS platforms (
             platform_name TEXT PRIMARY KEY,
             stock TEXT
         )
     ''')
     c.execute('''
-        CREATE TABLE reviews (
+        CREATE TABLE IF NOT EXISTS reviews (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT,
+            user_id INTEGER,
             review TEXT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     c.execute('''
-        CREATE TABLE admin_logs (
+        CREATE TABLE IF NOT EXISTS admin_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            admin_id TEXT,
+            admin_id INTEGER,
             action TEXT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     c.execute('''
-        CREATE TABLE channels (
+        CREATE TABLE IF NOT EXISTS channels (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             channel_link TEXT
         )
     ''')
     c.execute('''
-        CREATE TABLE admins (
-            user_id TEXT PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS admins (
+            user_id INTEGER PRIMARY KEY,
             username TEXT,
             role TEXT,
             banned INTEGER DEFAULT 0
         )
     ''')
     c.execute('''
-        CREATE TABLE keys (
+        CREATE TABLE IF NOT EXISTS keys (
             key TEXT PRIMARY KEY,
             type TEXT,
             points INTEGER,
@@ -85,12 +76,26 @@ def init_db():
     conn.commit()
     conn.close()
 
+def generate_internal_id():
+    """Generate a unique 8-digit number for internal_id."""
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    while True:
+        new_id = random.randint(10000000, 99999999)
+        c.execute("SELECT internal_id FROM users WHERE internal_id=?", (new_id,))
+        if not c.fetchone():
+            conn.close()
+            return new_id
+
 def add_user(telegram_id, username, join_date, pending_referrer=None):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    internal_id = str(uuid.uuid4())
-    c.execute("REPLACE INTO users (telegram_id, internal_id, username, join_date, pending_referrer) VALUES (?, ?, ?, ?, ?)",
-              (telegram_id, internal_id, username, join_date, pending_referrer))
+    # Check if user already exists
+    c.execute("SELECT * FROM users WHERE telegram_id=?", (telegram_id,))
+    if not c.fetchone():
+        internal_id = generate_internal_id()
+        c.execute("INSERT INTO users (telegram_id, internal_id, username, join_date, pending_referrer) VALUES (?, ?, ?, ?, ?)",
+                  (telegram_id, internal_id, username, join_date, pending_referrer))
     conn.commit()
     conn.close()
 
