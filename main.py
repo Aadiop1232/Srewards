@@ -17,18 +17,18 @@ init_db()
 
 @bot.message_handler(commands=["start"])
 def start_command(message):
+    # Always use the sender's Telegram ID without any fallback.
     telegram_id = str(message.from_user.id)
-    bot_id = str(bot.get_me().id)
-    if telegram_id == bot_id:
-        telegram_id = str(message.chat.id)
     print(f"DEBUG: /start from telegram id: {telegram_id}")
     pending_ref = extract_referral_code(message)
     user = get_user(telegram_id)
     if not user:
-        add_user(telegram_id,
-                 message.from_user.username or message.from_user.first_name,
-                 datetime.now().strftime("%Y-%m-%d"),
-                 pending_referrer=pending_ref)
+        add_user(
+            telegram_id,
+            message.from_user.username or message.from_user.first_name,
+            datetime.now().strftime("%Y-%m-%d"),
+            pending_referrer=pending_ref
+        )
     send_verification_message(bot, message)
 
 @bot.message_handler(commands=["gen"])
