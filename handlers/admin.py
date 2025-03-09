@@ -4,8 +4,8 @@ from telebot import types
 import sqlite3
 import random, string, json, re
 import config
+from db import DATABASE, log_admin_action
 
-# Use config.DATABASE if defined; otherwise default to "bot.db"
 def get_db_connection():
     return sqlite3.connect(getattr(config, "DATABASE", "bot.db"))
 
@@ -92,7 +92,7 @@ def get_admins():
 def add_admin(user_id, username, role="admin"):
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("INSERT OR REPLACE INTO admins (user_id, username, role, banned) VALUES (?, ?, ?, 0)", 
+    c.execute("INSERT OR REPLACE INTO admins (user_id, username, role, banned) VALUES (?, ?, ?, 0)",
               (str(user_id), username, role))
     conn.commit()
     conn.close()
@@ -167,7 +167,7 @@ def get_keys():
     conn.close()
     return rows
 
-def claim_key_in_db(key, telegram_id):
+def claim_key_in_db(key, user_id):
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT claimed, type, points FROM keys WHERE key=?", (key,))
@@ -179,16 +179,16 @@ def claim_key_in_db(key, telegram_id):
         conn.close()
         return "Key already claimed."
     points = row[2]
-    c.execute("UPDATE keys SET claimed=1, claimed_by=? WHERE key=?", (telegram_id, key))
-    c.execute("UPDATE users SET points = points + ? WHERE telegram_id=?", (points, telegram_id))
+    c.execute("UPDATE keys SET claimed=1, claimed_by=? WHERE key=?", (user_id, key))
+    c.execute("UPDATE users SET points = points + ? WHERE telegram_id=?", (points, user_id))
     conn.commit()
     conn.close()
     return f"Key redeemed successfully. You've been awarded {points} points."
 
-def update_user_points(telegram_id, points):
+def update_user_points(user_id, points):
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("UPDATE users SET points=? WHERE telegram_id=?", (points, telegram_id))
+    c.execute("UPDATE users SET points=? WHERE telegram_id=?", (points, user_id))
     conn.commit()
     conn.close()
 
@@ -238,8 +238,8 @@ def is_admin(user_or_id):
 def send_admin_menu(bot, message):
     """
     Displays the admin menu.
-    Since only admins/owners see the Admin Panel button in the main menu,
-    we assume this function is called only by authorized users.
+    Only admins/owners should be able to access this.
+    (In your main menu, the Admin Panel button is only shown to admins/owners.)
     """
     markup = types.InlineKeyboardMarkup(row_width=2)
     if is_owner(message.from_user):
@@ -256,68 +256,8 @@ def send_admin_menu(bot, message):
             types.InlineKeyboardButton("📈 Stock Mgmt", callback_data="admin_stock"),
             types.InlineKeyboardButton("👤 User Mgmt", callback_data="admin_users")
         )
-    markup.add(types.InlineKeyboardButton("📢 Notify", callback_data="admin_notify"))
     markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
     bot.send_message(message.chat.id, "<b>🛠 Admin Panel</b> 🛠", parse_mode="HTML", reply_markup=markup)
-
-def admin_callback_handler(bot, call):
-    """
-    Routes admin callback queries to the appropriate sub-handler.
-    """
-    data = call.data
-    if not is_admin(call.from_user):
-        bot.answer_callback_query(call.id, "Access prohibited.")
-        return
-    if data == "admin_platform":
-        handle_admin_platform(bot, call)
-    elif data == "admin_platform_add":
-        handle_admin_platform_add(bot, call)
-    elif data == "admin_platform_remove":
-        handle_admin_platform_remove(bot, call)
-    elif data.startswith("admin_platform_rm_"):
-        platform = data.split("admin_platform_rm_")[1]
-        handle_admin_platform_rm(bot, call, platform)
-    elif data == "admin_stock":
-        handle_admin_stock(bot, call)
-    elif data.startswith("admin_stock_"):
-        platform = data.split("admin_stock_")[1]
-        handle_admin_stock_platform(bot, call, platform)
-    elif data == "admin_channel":
-        handle_admin_channel(bot, call)
-    elif data == "admin_channel_add":
-        handle_admin_channel_add(bot, call)
-    elif data == "admin_channel_remove":
-        handle_admin_channel_remove(bot, call)
-    elif data.startswith("admin_channel_rm_"):
-        channel_id = data.split("admin_channel_rm_")[1]
-        handle_admin_channel_rm(bot, call, channel_id)
-    elif data == "admin_manage":
-        handle_admin_manage(bot, call)
-    elif data == "admin_list":
-        handle_admin_list(bot, call)
-    elif data == "admin_ban_unban":
-        handle_admin_ban_unban(bot, call)
-    elif data == "admin_remove":
-        handle_admin_remove(bot, call)
-    elif data == "admin_add":
-        handle_admin_add(bot, call)
-    elif data == "admin_add_owner":
-        handle_admin_add_owner(bot, call)
-    elif data == "admin_logs":
-        bot.answer_callback_query(call.id, "Admin logs not implemented.")
-    elif data == "admin_users":
-        bot.answer_callback_query(call.id, "User management not implemented.")
-    elif data == "user_ban_unban":
-        handle_user_ban_unban(bot, call)
-    elif data == "admin_keys":
-        handle_admin_keys(bot, call)
-    elif data == "admin_notify":
-        handle_admin_notify(bot, call)
-    elif data == "back_main":
-        from handlers.main_menu import send_main_menu
-        send_main_menu(bot, call.message)
-    else:
-        bot.answer_callback_query(call.id, "❓ Unknown admin command.")
 
 ###############################
 # PLATFORM SUB-HANDLERS
@@ -380,12 +320,23 @@ def handle_admin_stock(bot, call):
                           message_id=call.message.message_id, parse_mode="HTML", reply_markup=markup)
 
 def handle_admin_stock_platform(bot, call, platform):
-    msg = bot.send_message(call.message.chat.id, f"✏️ <b>Send the stock text for platform {platform} (each account on a new line):</b>", parse_mode="HTML")
+    msg = bot.send_message(call.message.chat.id, f"✏️ <b>Send the stock text for platform {platform}:</b>\n(You can type or attach a .txt file)", parse_mode="HTML")
     bot.register_next_step_handler(msg, lambda m: process_stock_upload(bot, m, platform))
 
 def process_stock_upload(bot, message, platform):
-    data = message.text.strip()
-    accounts = [line.strip() for line in data.splitlines() if line.strip()]
+    if message.content_type == "document":
+        try:
+            file_info = bot.get_file(message.document.file_id)
+            downloaded_file = bot.download_file(file_info.file_path)
+            data = downloaded_file.decode('utf-8')
+        except Exception as e:
+            bot.send_message(message.chat.id, f"❌ Error downloading file: {e}", parse_mode="HTML")
+            return
+    else:
+        data = message.text.strip()
+    # Use a regex to split the text into blocks separated by one or more blank lines.
+    import re
+    accounts = [block.strip() for block in re.split(r'\n\s*\n', data) if block.strip()]
     add_stock_to_platform(platform, accounts)
     bot.send_message(message.chat.id,
                      f"✅ Stock for <b>{platform}</b> updated with {len(accounts)} accounts.",
@@ -393,9 +344,12 @@ def process_stock_upload(bot, message, platform):
     send_admin_menu(bot, message)
 
 ###############################
-# CHANNEL SUB-HANDLERS
+# CHANNEL SUB-HANDLERS (Owners Only)
 ###############################
 def handle_admin_channel(bot, call):
+    if not is_owner(call.from_user.id):
+        bot.answer_callback_query(call.id, "🚫 Access prohibited. Only owners can manage channels.")
+        return
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton("➕ Add Channel", callback_data="admin_channel_add"),
@@ -406,6 +360,9 @@ def handle_admin_channel(bot, call):
                           message_id=call.message.message_id, parse_mode="HTML", reply_markup=markup)
 
 def handle_admin_channel_add(bot, call):
+    if not is_owner(call.from_user.id):
+        bot.answer_callback_query(call.id, "🚫 Access prohibited.")
+        return
     msg = bot.send_message(call.message.chat.id, "✏️ <b>Send the channel link to add:</b>", parse_mode="HTML")
     bot.register_next_step_handler(msg, lambda m: process_channel_add(bot, m))
 
@@ -424,6 +381,9 @@ def process_channel_add(bot, message):
     send_admin_menu(bot, message)
 
 def handle_admin_channel_remove(bot, call):
+    if not is_owner(call.from_user.id):
+        bot.answer_callback_query(call.id, "🚫 Access prohibited.")
+        return
     channels = get_channels()
     if not channels:
         bot.answer_callback_query(call.id, "😕 No channels to remove.")
@@ -441,9 +401,12 @@ def handle_admin_channel_rm(bot, call, channel_id):
     handle_admin_channel(bot, call)
 
 ###############################
-# ADMIN MANAGEMENT SUB-HANDLERS
+# ADMIN MANAGEMENT (Owners Only)
 ###############################
 def handle_admin_manage(bot, call):
+    if not is_owner(call.from_user.id):
+        bot.answer_callback_query(call.id, "🚫 Access prohibited. Only owners can manage admins.")
+        return
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton("👥 Admin List", callback_data="admin_list"),
@@ -506,13 +469,16 @@ def process_admin_remove(bot, message):
     send_admin_menu(bot, message)
 
 def handle_admin_add(bot, call):
-    msg = bot.send_message(call.message.chat.id, "✏️ <b>Send the admin Telegram ID and Username (separated by a space) to add:</b>", parse_mode="HTML")
+    if not is_owner(call.from_user.id):
+        bot.answer_callback_query(call.id, "🚫 Access prohibited. Only owners can add admins.")
+        return
+    msg = bot.send_message(call.message.chat.id, "✏️ <b>Send the UserID and Username (separated by a space) to add as admin:</b>", parse_mode="HTML")
     bot.register_next_step_handler(msg, lambda m: process_admin_add(bot, m))
 
 def process_admin_add(bot, message):
     parts = message.text.strip().split()
     if len(parts) < 2:
-        response = "❌ Please provide both Telegram ID and Username."
+        response = "❌ Please provide both UserID and Username."
     else:
         user_id, username = parts[0], " ".join(parts[1:])
         add_admin(user_id, username, role="admin")
@@ -521,6 +487,9 @@ def process_admin_add(bot, message):
     send_admin_menu(bot, message)
 
 def handle_admin_add_owner(bot, call):
+    if not is_owner(call.from_user.id):
+        bot.answer_callback_query(call.id, "🚫 Access prohibited. Only owners can add owners.")
+        return
     msg = bot.send_message(call.message.chat.id, "✏️ <b>Send the Telegram ID to add as owner:</b>", parse_mode="HTML")
     bot.register_next_step_handler(msg, lambda m: process_admin_add_owner(bot, m))
 
@@ -590,3 +559,59 @@ def process_admin_notify(bot, message):
             print(f"Error sending notification to {channel}: {e}")
     bot_instance.send_message(message.chat.id, "✅ <b>Notification sent to all verification channels.</b>", parse_mode="HTML")
     send_admin_menu(bot_instance, message)
+
+def admin_callback_handler(bot, call):
+    data = call.data
+    if not is_admin(call.from_user):
+        bot.answer_callback_query(call.id, "Access prohibited.")
+        return
+    if data == "admin_platform":
+        handle_admin_platform(bot, call)
+    elif data == "admin_platform_add":
+        handle_admin_platform_add(bot, call)
+    elif data == "admin_platform_remove":
+        handle_admin_platform_remove(bot, call)
+    elif data.startswith("admin_platform_rm_"):
+        platform = data.split("admin_platform_rm_")[1]
+        handle_admin_platform_rm(bot, call, platform)
+    elif data == "admin_stock":
+        handle_admin_stock(bot, call)
+    elif data.startswith("admin_stock_"):
+        platform = data.split("admin_stock_")[1]
+        handle_admin_stock_platform(bot, call, platform)
+    elif data == "admin_channel":
+        handle_admin_channel(bot, call)
+    elif data == "admin_channel_add":
+        handle_admin_channel_add(bot, call)
+    elif data == "admin_channel_remove":
+        handle_admin_channel_remove(bot, call)
+    elif data.startswith("admin_channel_rm_"):
+        channel_id = data.split("admin_channel_rm_")[1]
+        handle_admin_channel_rm(bot, call, channel_id)
+    elif data == "admin_manage":
+        handle_admin_manage(bot, call)
+    elif data == "admin_list":
+        handle_admin_list(bot, call)
+    elif data == "admin_ban_unban":
+        handle_admin_ban_unban(bot, call)
+    elif data == "admin_remove":
+        handle_admin_remove(bot, call)
+    elif data == "admin_add":
+        handle_admin_add(bot, call)
+    elif data == "admin_add_owner":
+        handle_admin_add_owner(bot, call)
+    elif data == "admin_logs":
+        handle_admin_logs(bot, call)
+    elif data == "admin_users":
+        handle_admin_users(bot, call)
+    elif data == "user_ban_unban":
+        handle_user_ban_unban(bot, call)
+    elif data == "admin_keys":
+        handle_admin_keys(bot, call)
+    elif data == "admin_notify":
+        handle_admin_notify(bot, call)
+    elif data == "back_main":
+        from handlers.main_menu import send_main_menu
+        send_main_menu(bot, call.message)
+    else:
+        bot.answer_callback_query(call.id, "❓ Unknown admin command.")
