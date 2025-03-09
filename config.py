@@ -1,10 +1,11 @@
 # config.py
-TOKEN = "7760154469:AAHXLYuSgHHWpP9TVUm-bPiy0wBI0U_wHTg"  # Replace with your actual bot token
+TOKEN = "YOUR_BOT_TOKEN_HERE"  # Replace with your actual bot token
 BOT_USERNAME = "ShadowRewardsBot"  # Without the '@'
 
-# Hard-coded owner IDs and admin IDs (strings)
-OWNERS = ["7218606355", "5822279535", "6355646303", "7760154469"]
-ADMINS = ["6061298481", "1572380763", "7218606355"]
+# Hard-coded internal IDs for owners and admins.
+# After a user registers, check their internal_id from the database and update these lists accordingly.
+OWNERS = ["<owner_internal_id1>", "<owner_internal_id2>"]
+ADMINS = ["<admin_internal_id1>", "<admin_internal_id2>"]
 
 REQUIRED_CHANNELS = [
     "https://t.me/shadowsquad0",
