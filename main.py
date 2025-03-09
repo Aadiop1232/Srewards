@@ -10,7 +10,6 @@ from handlers.rewards import send_rewards_menu, handle_platform_selection, claim
 from handlers.account_info import send_account_info
 from handlers.review import prompt_review
 from handlers.admin import send_admin_menu, admin_callback_handler, is_admin, generate_normal_key, generate_premium_key, add_key
-import sys
 
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
 init_db()
