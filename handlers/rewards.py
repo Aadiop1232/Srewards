@@ -4,6 +4,7 @@ from telebot import types
 import sqlite3
 import json
 import random
+import re
 from db import DATABASE, update_user_points, get_user
 
 def get_db_connection():
@@ -80,5 +81,31 @@ def claim_account(bot, call, platform):
     new_points = current_points - 2
     update_user_points(telegram_id, new_points)
     bot.answer_callback_query(call.id, "Account claimed!")
-    bot.send_message(call.message.chat.id, f"<b>Your account for {platform}:</b>\n<code>{account}</code>\nRemaining points: {new_points}", parse_mode="HTML")
+    bot.send_message(call.message.chat.id,
+                     f"<b>Your account for {platform}:</b>\n<code>{account}</code>\nRemaining points: {new_points}",
+                     parse_mode="HTML")
+
+def process_stock_upload(bot, message, platform):
+    # If a document is attached, try to download and read its text.
+    if hasattr(message, 'document'):
+        try:
+            file_info = bot.get_file(message.document.file_id)
+            downloaded_file = bot.download_file(file_info.file_path)
+            data = downloaded_file.decode('utf-8')
+        except Exception as e:
+            bot.send_message(message.chat.id, f"❌ Error downloading file: {e}", parse_mode="HTML")
+            return
+    else:
+        data = message.text.strip()
+
+    # Split the input text into blocks by one or more blank lines.
+    # This way, each account's full capture (which may span multiple lines) is kept as one block.
+    accounts = [block.strip() for block in re.split(r'\n\s*\n', data) if block.strip()]
+    update_stock_for_platform(platform, accounts)
+    bot.send_message(message.chat.id,
+                     f"✅ Stock for <b>{platform}</b> updated with {len(accounts)} accounts.",
+                     parse_mode="HTML")
+    # Return to the admin menu.
+    from handlers.admin import send_admin_menu
+    send_admin_menu(bot, message)
     
