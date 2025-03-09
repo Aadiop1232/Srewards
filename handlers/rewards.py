@@ -72,7 +72,11 @@ def claim_account(bot, call, platform):
     if user is None:
         bot.answer_callback_query(call.id, "User not found.")
         return
-    current_points = user[3]  # points field
+    try:
+        current_points = int(user[3])  # Convert points to integer
+    except Exception:
+        bot.answer_callback_query(call.id, "Error reading your points.")
+        return
     if current_points < 2:
         bot.answer_callback_query(call.id, "Insufficient points (each account costs 2 points). Earn more by referring or redeeming a key.")
         return
@@ -102,14 +106,11 @@ def process_stock_upload(bot, message, platform):
             return
     else:
         data = message.text.strip()
-
-    # Use a regex to capture account blocks.
-    # The pattern matches text that starts with an email address (at the beginning of a line)
-    # and captures everything until the next line that starts with an email or the end of the text.
-    pattern = r"(^[\w\.-]+@[\w\.-]+\.\w+.*?)(?=^[\w\.-]+@[\w\.-]+\.\w+|\Z)"
-    accounts = re.findall(pattern, data, flags=re.M|re.S)
+    # Use re.split to split the text into account blocks.
+    # This splits on a newline that is immediately followed by an email address.
+    accounts = re.split(r'\n(?=[\w\.-]+@[\w\.-]+\.\w+)', data)
+    accounts = [acct.strip() for acct in accounts if acct.strip()]
     if not accounts:
-        # If no matches, treat the entire text as one account.
         accounts = [data]
     update_stock_for_platform(platform, accounts)
     bot.send_message(message.chat.id,
@@ -117,4 +118,4 @@ def process_stock_upload(bot, message, platform):
                      parse_mode="HTML")
     from handlers.admin import send_admin_menu
     send_admin_menu(bot, message)
-    
+                              
