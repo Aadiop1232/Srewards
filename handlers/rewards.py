@@ -4,7 +4,7 @@ from telebot import types
 import sqlite3
 import json
 import random
-from db import DATABASE
+from db import DATABASE, update_user_points, get_user
 
 def get_db_connection():
     return sqlite3.connect(DATABASE)
@@ -66,6 +66,15 @@ def handle_platform_selection(bot, call, platform):
                           message_id=call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
 def claim_account(bot, call, platform):
+    user_id = str(call.from_user.id)
+    user = get_user(user_id)
+    if user is None:
+        bot.answer_callback_query(call.id, "User not found.")
+        return
+    current_points = user[3]
+    if current_points < 2:
+        bot.answer_callback_query(call.id, "Insufficient points (each claim costs 2 points). Earn more by referring or redeeming a key.")
+        return
     stock = get_stock_for_platform(platform)
     if not stock:
         bot.answer_callback_query(call.id, "😞 No accounts available.")
@@ -73,6 +82,8 @@ def claim_account(bot, call, platform):
     index = random.randint(0, len(stock) - 1)
     account = stock.pop(index)
     update_stock_for_platform(platform, stock)
+    new_points = current_points - 2
+    update_user_points(user_id, new_points)
     bot.answer_callback_query(call.id, "🎉 Account claimed!")
-    bot.send_message(call.message.chat.id, f"💳 *Your account for {platform}:*\n`{account}`", parse_mode="Markdown")
-        
+    bot.send_message(call.message.chat.id, f"💳 *Your account for {platform}:*\n`{account}`\nRemaining points: {new_points}", parse_mode="Markdown")
+    
