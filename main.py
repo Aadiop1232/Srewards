@@ -145,7 +145,7 @@ def tutorial_command(message):
         "3. Earn more points by referring friends (each referral gives 4 points) or redeeming keys (/redeem &lt;key&gt;).\n"
         "4. Admins/Owners can generate keys using /gen and lend points using /lend.\n"
         "5. Use /notify to broadcast a message to all owners/admins.\n"
-        "6. Your account info always shows your real-time balance and referral count (using your internal User ID).\n"
+        "6. Your account info always shows your real-time balance and referral count (using your Telegram User ID).\n"
         "Good luck! 😊"
     )
     bot.send_message(message.chat.id, text, parse_mode="HTML")
@@ -207,4 +207,4 @@ def callback_verify(call):
     process_verified_referral(call.from_user.id)
 
 bot.polling(none_stop=True)
-        
+    
