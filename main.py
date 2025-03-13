@@ -6,7 +6,7 @@ from handlers.rewards import send_rewards_menu
 from handlers.account_info import send_account_info
 from handlers.review import prompt_review
 from handlers.verification import send_verification_message, handle_verification_callback
-from handlers.admin import send_admin_menu  # Importing the correct function for admin menu
+from handlers.admin import send_admin_menu, handle_admin_platform  # Correct import for admin platform handling
 from telebot import types
 import config
 
@@ -67,7 +67,7 @@ def admin_panel(call):
 # Admin Panel callbacks: Platform Management, User Management, Key Management
 @bot.callback_query_handler(func=lambda call: call.data == 'admin_platform')
 def admin_platform(call):
-    handle_admin_platform(bot, call)
+    handle_admin_platform(bot, call)  # Calls the platform management handler
 
 @bot.callback_query_handler(func=lambda call: call.data == 'admin_users')
 def admin_users(call):
