@@ -1,32 +1,30 @@
-import telebot
-from db import get_user
-from telebot import types
+# handlers/account_info.py
+from db import get_user, add_user
+from datetime import datetime
 
-def send_account_info(bot, message):
+def send_account_info(bot, update):
     """
-    Send the account information for the user, including username, points, and referrals.
+    Sends the account information for the user who triggered the update.
     """
-    user_id = str(message.from_user.id)
-    user = get_user(user_id)
+    telegram_id = str(update.from_user.id)
+    chat_id = update.message.chat.id if hasattr(update, "message") and update.message else telegram_id
 
-    if user:
-        # Get user data from the database
-        username = user[1] if user[1] else "No username"
-        join_date = user[2] if user[2] else "N/A"
-        points = user[3] if user[3] else 0
-        referrals = user[4] if user[4] else 0
-        status = "Banned" if user[5] == 1 else "Active"
-        
-        # Build the account info message
-        text = f"<b>Account Info:</b>\n"
-        text += f"Username: {username}\n"
-        text += f"Join Date: {join_date}\n"
-        text += f"Points: {points}\n"
-        text += f"Referrals: {referrals}\n"
-        text += f"Status: {status}\n"
-        
-        # Send the account info
-        bot.send_message(message.chat.id, text, parse_mode="HTML")
-    else:
-        bot.send_message(message.chat.id, "❌ Error: User not found.")
-        
+    user = get_user(telegram_id)
+    if not user:
+        add_user(
+            telegram_id,
+            update.from_user.username or update.from_user.first_name,
+            datetime.now().strftime("%Y-%m-%d")
+        )
+        user = get_user(telegram_id)
+    
+    text = (
+        f"<b>👤 Account Info 😁</b>\n"
+        f"• <b>Username:</b> {user[2]}\n"
+        f"• <b>User ID:</b> {user[0]}\n"
+        f"• <b>Join Date:</b> {user[3]}\n"
+        f"• <b>Balance:</b> {user[4]} points\n"
+        f"• <b>Total Referrals:</b> {user[5]}"
+    )
+    bot.send_message(chat_id, text, parse_mode="HTML")
+    
