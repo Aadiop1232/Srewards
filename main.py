@@ -13,6 +13,7 @@ from handlers.admin import send_admin_menu, admin_callback_handler, is_admin, ge
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
 init_db()
 
+# Start command (user registration and verification)
 @bot.message_handler(commands=["start"])
 def start_command(message):
     user_id = str(message.from_user.id)
@@ -25,6 +26,7 @@ def start_command(message):
                  pending_referrer=pending_ref)
     send_verification_message(bot, message)
 
+# Main Menu: Rewards, Account Info, Referral System, Review
 @bot.callback_query_handler(func=lambda call: call.data == "menu_rewards")
 def callback_menu_rewards(call):
     send_rewards_menu(bot, call.message)
@@ -70,6 +72,7 @@ def callback_verify(call):
     handle_verification_callback(bot, call)
     process_verified_referral(call.from_user.id)
 
+# Admin commands (for generating keys, managing platform stock, etc.)
 @bot.message_handler(commands=["gen"])
 def gen_command(message):
     user_id = str(message.from_user.id)
@@ -113,6 +116,7 @@ def redeem_command(message):
     result = claim_key_in_db(key, user_id)
     bot.reply_to(message, result)
 
+# Tutorial command for users to understand how to use the bot
 @bot.message_handler(commands=["tutorial"])
 def tutorial_command(message):
     text = (
@@ -125,6 +129,7 @@ def tutorial_command(message):
     )
     bot.send_message(message.chat.id, text, parse_mode="HTML")
 
+# Admin panel for managing various bot functionalities
 @bot.callback_query_handler(func=lambda call: call.data == "admin_platform")
 def callback_admin_platform(call):
     send_admin_menu(bot, call.message)
@@ -134,4 +139,3 @@ def callback_admin(call):
     admin_callback_handler(bot, call)
 
 bot.polling(none_stop=True)
-                     
