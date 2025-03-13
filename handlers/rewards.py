@@ -70,31 +70,31 @@ def claim_account(bot, call, platform):
     user_id = str(call.from_user.id)
     user = get_user(user_id)
     if user is None:
-        bot.answer_callback_query(call.id, "User not found.")
+        bot.send_message(call.message.chat.id, "User not found.")
         return
     try:
-        # Split the stored points string in case extra text is appended.
         points_str = str(user[3]).strip().split()[0]
         current_points = int(points_str)
     except Exception as e:
-        bot.answer_callback_query(call.id, f"Error reading your points: {e}")
+        bot.send_message(call.message.chat.id, f"Error reading your points: {e}")
         return
     if current_points < 2:
-        bot.answer_callback_query(call.id, "Insufficient points (each account costs 2 points). Earn more by referring or redeeming a key.")
+        bot.send_message(call.message.chat.id, "Insufficient points (each account costs 2 points). Earn more by referring or redeeming a key.")
         return
     stock = get_stock_for_platform(platform)
     if not stock:
-        bot.answer_callback_query(call.id, "😞 No accounts available.")
+        bot.send_message(call.message.chat.id, "No accounts available.")
         return
     index = random.randint(0, len(stock) - 1)
     account = stock.pop(index)
     update_stock_for_platform(platform, stock)
     new_points = current_points - 2
     update_user_points(user_id, new_points)
-    bot.answer_callback_query(call.id, "🎉 Account claimed!")
-    bot.send_message(call.message.chat.id,
-                     f"<b>Your account for {platform}:</b>\n<code>{account}</code>\nRemaining points: {new_points}",
-                     parse_mode="HTML")
+    bot.send_message(
+        call.message.chat.id,
+        f"🎉 Account claimed!\nYour account for {platform}:\n<code>{account}</code>\nRemaining points: {new_points}",
+        parse_mode="HTML"
+    )
 
 def process_stock_upload(bot, message, platform):
     if message.content_type == "document":
@@ -118,4 +118,4 @@ def process_stock_upload(bot, message, platform):
                      parse_mode="HTML")
     from handlers.admin import send_admin_menu
     send_admin_menu(bot, message)
-        
+    
