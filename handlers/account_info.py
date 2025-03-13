@@ -3,13 +3,7 @@ from db import get_user, add_user
 from datetime import datetime
 
 def send_account_info(bot, update):
-    """
-    Sends the account information for the user.
-    If update is a callback query, it uses update.from_user and update.message.chat.id.
-    If update is a message, it uses update.from_user and update.chat.id.
-    """
     if hasattr(update, "data"):
-        # update is a callback query
         user_obj = update.from_user
         chat_id = update.message.chat.id
     else:
@@ -17,7 +11,6 @@ def send_account_info(bot, update):
         chat_id = update.chat.id
 
     telegram_id = str(user_obj.id)
-
     user = get_user(telegram_id)
     if not user:
         add_user(
