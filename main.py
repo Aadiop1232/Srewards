@@ -1,11 +1,12 @@
 import telebot
-from db import init_db, get_user, update_user_points, update_user_verified
+from db import init_db, get_user
 from handlers.main_menu import send_main_menu
 from handlers.referral import send_referral_menu
 from handlers.rewards import send_rewards_menu
 from handlers.account_info import send_account_info
 from handlers.review import prompt_review
 from handlers.verification import send_verification_message, handle_verification_callback
+from handlers.admin import send_admin_menu  # Importing the correct function for admin menu
 from telebot import types
 import config
 
@@ -61,7 +62,7 @@ def back_to_main(call):
 # Admin actions (for admins and owners only)
 @bot.callback_query_handler(func=lambda call: call.data == 'menu_admin')
 def admin_panel(call):
-    send_admin_menu(bot, call.message)
+    send_admin_menu(bot, call.message)  # Ensure you're calling the correct function for the admin panel
 
 # Admin Panel callbacks: Platform Management, User Management, Key Management
 @bot.callback_query_handler(func=lambda call: call.data == 'admin_platform')
