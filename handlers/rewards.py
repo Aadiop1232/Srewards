@@ -73,7 +73,8 @@ def claim_account(bot, call, platform):
         bot.send_message(call.message.chat.id, "User not found.")
         return
     try:
-        points_str = str(user[3]).strip().split()[0]
+        # Now use user[2] as the points balance.
+        points_str = str(user[2]).strip().split()[0]
         current_points = int(points_str)
     except Exception as e:
         bot.send_message(call.message.chat.id, f"Error reading your points: {e}")
@@ -118,4 +119,4 @@ def process_stock_upload(bot, message, platform):
                      parse_mode="HTML")
     from handlers.admin import send_admin_menu
     send_admin_menu(bot, message)
-    
+        
