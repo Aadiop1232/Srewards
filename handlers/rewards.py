@@ -1,16 +1,17 @@
-# handlers/rewards.py
 import telebot
 from telebot import types
 import sqlite3
 import json
 import random
-import re
 from db import DATABASE, update_user_points, get_user
 
 def get_db_connection():
     return sqlite3.connect(DATABASE)
 
 def get_platforms():
+    """
+    Retrieve all available platforms from the database.
+    """
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT platform_name FROM platforms")
@@ -19,6 +20,9 @@ def get_platforms():
     return platforms
 
 def get_stock_for_platform(platform_name):
+    """
+    Retrieve the stock (list of accounts) for a specific platform.
+    """
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT stock FROM platforms WHERE platform_name=?", (platform_name,))
@@ -32,6 +36,9 @@ def get_stock_for_platform(platform_name):
     return []
 
 def update_stock_for_platform(platform_name, stock):
+    """
+    Update the stock for a specific platform in the database.
+    """
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("UPDATE platforms SET stock=? WHERE platform_name=?", (json.dumps(stock), platform_name))
@@ -39,7 +46,10 @@ def update_stock_for_platform(platform_name, stock):
     conn.close()
 
 def send_rewards_menu(bot, message):
-    platforms = get_platforms()
+    """
+    Display the available platforms and allow users to claim an account.
+    """
+    platforms = get_platforms()  # Fetch platforms from the database
     markup = types.InlineKeyboardMarkup(row_width=2)
     if not platforms:
         bot.send_message(message.chat.id, "😢 <b>No platforms available at the moment.</b>", parse_mode="HTML")
@@ -54,6 +64,10 @@ def send_rewards_menu(bot, message):
         bot.send_message(message.chat.id, "<b>🎯 Available Platforms 🎯</b>", parse_mode="HTML", reply_markup=markup)
 
 def handle_platform_selection(bot, call, platform):
+    """
+    Handle the selection of a platform by a user.
+    Display account availability for the selected platform.
+    """
     stock = get_stock_for_platform(platform)
     if stock:
         text = f"<b>📺 {platform}</b>:\n✅ <b>{len(stock)} accounts available!</b>"
@@ -67,6 +81,10 @@ def handle_platform_selection(bot, call, platform):
                           message_id=call.message.message_id, parse_mode="HTML", reply_markup=markup)
 
 def claim_account(bot, call, platform):
+    """
+    Handle the process of claiming an account for a user.
+    Deduct points and provide the account details.
+    """
     user_id = str(call.from_user.id)
     user = get_user(user_id)
     if user is None:
@@ -74,7 +92,7 @@ def claim_account(bot, call, platform):
         return
     try:
         # Convert the points field to a number (using float first in case it's stored as a string like "20" or "20.0")
-        current_points = int(float(user[4]))
+        current_points = int(float(user[3]))
     except Exception:
         bot.answer_callback_query(call.id, "Error reading your points.")
         return
@@ -96,7 +114,10 @@ def claim_account(bot, call, platform):
                      parse_mode="HTML")
 
 def process_stock_upload(bot, message, platform):
-    # If a document (.txt file) is attached, download its content.
+    """
+    Process stock (accounts) that are uploaded by the admin.
+    Accepts both text and document types.
+    """
     if message.content_type == "document":
         try:
             file_info = bot.get_file(message.document.file_id)
@@ -107,17 +128,18 @@ def process_stock_upload(bot, message, platform):
             return
     else:
         data = message.text.strip()
-    # Use a regex to capture account blocks.
-    # This pattern looks for blocks that start with an email address and lazily captures until the next email or end of text.
+    
+    # Regex pattern to capture account blocks that start with an email address
     pattern = r"((?:[\w\.-]+@[\w\.-]+\.\w+).*?)(?=(?:[\w\.-]+@[\w\.-]+\.\w+)|$)"
     accounts = re.findall(pattern, data, flags=re.DOTALL)
     accounts = [acct.strip() for acct in accounts if acct.strip()]
     if not accounts:
-        accounts = [data]
+        accounts = [data]  # Fallback in case no accounts were captured
+    
+    # Update the stock for the platform
     update_stock_for_platform(platform, accounts)
     bot.send_message(message.chat.id,
                      f"✅ Stock for <b>{platform}</b> updated with {len(accounts)} accounts.",
                      parse_mode="HTML")
     from handlers.admin import send_admin_menu
     send_admin_menu(bot, message)
-        
