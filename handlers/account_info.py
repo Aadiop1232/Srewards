@@ -4,16 +4,25 @@ from datetime import datetime
 
 def send_account_info(bot, update):
     """
-    Sends the account information for the user who triggered the update.
+    Sends the account information for the user.
+    If update is a callback query, it uses update.from_user and update.message.chat.id.
+    If update is a message, it uses update.from_user and update.chat.id.
     """
-    telegram_id = str(update.from_user.id)
-    chat_id = update.message.chat.id if hasattr(update, "message") and update.message else telegram_id
+    if hasattr(update, "data"):
+        # This is a callback query; update.from_user is the actual user.
+        user_obj = update.from_user
+        chat_id = update.message.chat.id
+    else:
+        user_obj = update.from_user
+        chat_id = update.chat.id
+
+    telegram_id = str(user_obj.id)
 
     user = get_user(telegram_id)
     if not user:
         add_user(
             telegram_id,
-            update.from_user.username or update.from_user.first_name,
+            user_obj.username or user_obj.first_name,
             datetime.now().strftime("%Y-%m-%d")
         )
         user = get_user(telegram_id)
