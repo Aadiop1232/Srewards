@@ -10,15 +10,14 @@ def extract_referral_code(message):
                 return part[len("ref_"):]
     return None
 
-def process_verified_referral(telegram_id):
+def process_verified_referral(telegram_id, bot_instance):
     referred = get_user(str(telegram_id))
     if referred and referred[6]:
         referrer_id = referred[6]
         add_referral(referrer_id, referred[0])
         clear_pending_referral(str(telegram_id))
-        bot = telebot.TeleBot(config.TOKEN)
         try:
-            bot.send_message(referrer_id, "<b>🎉 Referral completed!</b> You earned 4 points.", parse_mode="HTML")
+            bot_instance.send_message(referrer_id, "<b>🎉 Referral completed!</b> You earned 4 points.", parse_mode="HTML")
         except Exception as e:
             print(f"Error notifying referrer: {e}")
 
