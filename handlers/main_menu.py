@@ -4,7 +4,7 @@ from telebot import types
 from handlers.admin import is_admin
 
 def send_main_menu(bot, update):
-    # Allow update to be either a message or a callback query.
+    # Accept update as either a message or callback query
     if hasattr(update, "data"):
         user_obj = update.from_user
         chat_id = update.message.chat.id
