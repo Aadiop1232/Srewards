@@ -9,7 +9,7 @@ def send_account_info(bot, update):
     If update is a message, it uses update.from_user and update.chat.id.
     """
     if hasattr(update, "data"):
-        # This is a callback query; update.from_user is the actual user.
+        # update is a callback query
         user_obj = update.from_user
         chat_id = update.message.chat.id
     else:
