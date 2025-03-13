@@ -2,7 +2,6 @@ import sqlite3
 import json
 import config
 
-# The database file (use a relative or absolute path)
 DATABASE = "bot.db"
 
 def init_db():
@@ -54,24 +53,6 @@ def init_db():
             )
         ''')
 
-        # Admin logs table: stores admin actions (e.g., banning/unbanning users)
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS admin_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                admin_id TEXT,
-                action TEXT,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-
-        # Channels table: stores channels for verification
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS channels (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                channel_link TEXT
-            )
-        ''')
-
         # Admins table: stores admins and their roles
         c.execute('''
             CREATE TABLE IF NOT EXISTS admins (
@@ -100,6 +81,7 @@ def init_db():
     except sqlite3.Error as e:
         print(f"❌ Error initializing database: {e}")
 
+
 # Functions for managing users
 def add_user(telegram_id, username, join_date, pending_referrer=None):
     try:
@@ -124,26 +106,19 @@ def get_user(telegram_id):
         print(f"❌ Error fetching user: {e}")
         return None
 
-def update_user_pending_referral(telegram_id, pending_referrer):
+def update_user_points(user_id, new_points):
     try:
         conn = sqlite3.connect(DATABASE)
         c = conn.cursor()
-        c.execute("UPDATE users SET pending_referrer=? WHERE telegram_id=?", (pending_referrer, telegram_id))
+        c.execute("UPDATE users SET points=? WHERE telegram_id=?", (new_points, user_id))
         conn.commit()
         conn.close()
+        print(f"✅ Points for user {user_id} updated to {new_points}.")
     except sqlite3.Error as e:
-        print(f"❌ Error updating pending referral: {e}")
+        print(f"❌ Error updating points for user {user_id}: {e}")
 
-def clear_pending_referral(telegram_id):
-    try:
-        conn = sqlite3.connect(DATABASE)
-        c = conn.cursor()
-        c.execute("UPDATE users SET pending_referrer=NULL WHERE telegram_id=?", (telegram_id,))
-        conn.commit()
-        conn.close()
-    except sqlite3.Error as e:
-        print(f"❌ Error clearing pending referral: {e}")
 
+# Functions for handling referrals
 def add_referral(referrer_id, referred_id):
     try:
         conn = sqlite3.connect(DATABASE)
@@ -159,7 +134,75 @@ def add_referral(referrer_id, referred_id):
     except sqlite3.Error as e:
         print(f"❌ Error adding referral: {e}")
 
-# Functions for handling keys
+
+# Functions for managing platforms
+def get_platforms():
+    try:
+        conn = sqlite3.connect(DATABASE)
+        c = conn.cursor()
+        c.execute("SELECT platform_name FROM platforms")
+        rows = c.fetchall()
+        conn.close()
+        return rows
+    except sqlite3.Error as e:
+        print(f"❌ Error fetching platforms: {e}")
+        return []
+
+def add_platform(platform_name):
+    try:
+        conn = sqlite3.connect(DATABASE)
+        c = conn.cursor()
+        c.execute("INSERT INTO platforms (platform_name, stock) VALUES (?, ?)", (platform_name, json.dumps([])))
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        print(f"❌ Error adding platform: {e}")
+
+def remove_platform(platform_name):
+    try:
+        conn = sqlite3.connect(DATABASE)
+        c = conn.cursor()
+        c.execute("DELETE FROM platforms WHERE platform_name=?", (platform_name,))
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        print(f"❌ Error removing platform: {e}")
+
+def update_stock_for_platform(platform_name, stock):
+    """
+    Update the stock for a specific platform in the database.
+    """
+    try:
+        conn = sqlite3.connect(DATABASE)
+        c = conn.cursor()
+        c.execute("UPDATE platforms SET stock=? WHERE platform_name=?", (json.dumps(stock), platform_name))
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        print(f"❌ Error updating platform stock: {e}")
+
+def get_stock_for_platform(platform_name):
+    """
+    Retrieve the stock (list of accounts) for a specific platform.
+    """
+    try:
+        conn = sqlite3.connect(DATABASE)
+        c = conn.cursor()
+        c.execute("SELECT stock FROM platforms WHERE platform_name=?", (platform_name,))
+        row = c.fetchone()
+        conn.close()
+        if row and row[0]:
+            try:
+                return json.loads(row[0])
+            except Exception:
+                return []
+        return []
+    except sqlite3.Error as e:
+        print(f"❌ Error fetching stock for platform {platform_name}: {e}")
+        return []
+
+
+# Functions for managing keys
 def add_key(key, key_type, points):
     try:
         conn = sqlite3.connect(DATABASE)
@@ -170,19 +213,19 @@ def add_key(key, key_type, points):
     except sqlite3.Error as e:
         print(f"❌ Error adding key: {e}")
 
-def get_key(key):
+def get_keys():
     try:
         conn = sqlite3.connect(DATABASE)
         c = conn.cursor()
-        c.execute("SELECT key, type, points, claimed FROM keys WHERE key=?", (key,))
-        result = c.fetchone()
+        c.execute("SELECT key, type, points, claimed, claimed_by FROM keys")
+        rows = c.fetchall()
         conn.close()
-        return result
+        return rows
     except sqlite3.Error as e:
-        print(f"❌ Error fetching key: {e}")
-        return None
+        print(f"❌ Error fetching keys: {e}")
+        return []
 
-def claim_key_in_db(key, telegram_id):
+def claim_key_in_db(key, user_id):
     try:
         conn = sqlite3.connect(DATABASE)
         c = conn.cursor()
@@ -195,14 +238,15 @@ def claim_key_in_db(key, telegram_id):
             conn.close()
             return "Key already claimed."
         points = row[2]
-        c.execute("UPDATE keys SET claimed=1, claimed_by=? WHERE key=?", (telegram_id, key))
-        c.execute("UPDATE users SET points = points + ? WHERE telegram_id=?", (points, telegram_id))
+        c.execute("UPDATE keys SET claimed=1, claimed_by=? WHERE key=?", (user_id, key))
+        c.execute("UPDATE users SET points = points + ? WHERE telegram_id=?", (points, user_id))
         conn.commit()
         conn.close()
         return f"Key redeemed successfully. You've been awarded {points} points."
     except sqlite3.Error as e:
         print(f"❌ Error claiming key: {e}")
         return "An error occurred while claiming the key."
+
 
 # Functions for managing admins
 def get_admins():
