@@ -20,13 +20,14 @@ def send_account_info(bot, update):
         )
         user = get_user(telegram_id)
     
+    # Using new order: [0: telegram_id, 1: username, 2: points, 3: join_date, 4: referrals, 5: banned, 6: pending_referrer]
     text = (
         f"<b>👤 Account Info 😁</b>\n"
-        f"• <b>Username:</b> {user[2]}\n"
+        f"• <b>Username:</b> {user[1]}\n"
         f"• <b>User ID:</b> {user[0]}\n"
         f"• <b>Join Date:</b> {user[3]}\n"
-        f"• <b>Balance:</b> {user[4]} points\n"
-        f"• <b>Total Referrals:</b> {user[5]}"
+        f"• <b>Balance:</b> {user[2]} points\n"
+        f"• <b>Total Referrals:</b> {user[4]}"
     )
     bot.send_message(chat_id, text, parse_mode="HTML")
     
