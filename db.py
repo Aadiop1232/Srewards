@@ -170,6 +170,21 @@ def update_user_points(telegram_id, points):
     conn.commit()
     conn.close()
 
+# New functions added for banning and unbanning users
+def ban_user(telegram_id):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("UPDATE users SET banned=1 WHERE telegram_id=?", (telegram_id,))
+    conn.commit()
+    conn.close()
+
+def unban_user(telegram_id):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("UPDATE users SET banned=0 WHERE telegram_id=?", (telegram_id,))
+    conn.commit()
+    conn.close()
+
 if __name__ == '__main__':
     init_db()
     print("✅ Database initialized!")
