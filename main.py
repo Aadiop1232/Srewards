@@ -105,9 +105,10 @@ def callback_claim(call):
     platform = call.data.split("claim_")[1]
     claim_account(bot, call, platform)
 
+# Updated callback: Pass the callback query (call) instead of call.message
 @bot.callback_query_handler(func=lambda call: call.data == "menu_account")
 def callback_menu_account(call):
-    send_account_info(bot, call.message)
+    send_account_info(bot, call)
 
 @bot.callback_query_handler(func=lambda call: call.data == "menu_referral")
 def callback_menu_referral(call):
@@ -125,10 +126,11 @@ def callback_menu_admin(call):
 def callback_admin(call):
     admin_callback_handler(bot, call)
 
+# Updated verify callback: pass the bot instance to process_verified_referral
 @bot.callback_query_handler(func=lambda call: call.data == "verify")
 def callback_verify(call):
     handle_verification_callback(bot, call)
-    process_verified_referral(call.from_user.id)
+    process_verified_referral(call.from_user.id, bot)
 
 bot.polling(none_stop=True)
-            
+        
