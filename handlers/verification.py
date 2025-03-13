@@ -5,9 +5,6 @@ import config
 from handlers.admin import is_admin
 
 def check_channel_membership(bot, user_id):
-    """
-    Checks if the user is a member of all required channels.
-    """
     for channel in config.REQUIRED_CHANNELS:
         try:
             channel_username = channel.rstrip('/').split("/")[-1]
@@ -25,17 +22,12 @@ def check_channel_membership(bot, user_id):
     return True
 
 def send_verification_message(bot, message):
-    """
-    Sends a verification message with channel join buttons and a Verify button.
-    """
     user_id = message.from_user.id
-
     if is_admin(user_id):
         bot.send_message(message.chat.id, "✨ Welcome, Admin/Owner! You are automatically verified! ✨")
         from handlers.main_menu import send_main_menu
         send_main_menu(bot, message)
         return
-
     if check_channel_membership(bot, user_id):
         bot.send_message(message.chat.id, "✅ You are verified! 🎉")
         from handlers.main_menu import send_main_menu
@@ -51,9 +43,6 @@ def send_verification_message(bot, message):
         bot.send_message(message.chat.id, text, reply_markup=markup)
 
 def handle_verification_callback(bot, call):
-    """
-    Re-checks channel membership when the user clicks "Verify".
-    """
     user_id = call.from_user.id
     if check_channel_membership(bot, user_id):
         bot.answer_callback_query(call.id, "✅ Verification successful! 🎉")
@@ -61,4 +50,4 @@ def handle_verification_callback(bot, call):
         send_main_menu(bot, call.message)
     else:
         bot.answer_callback_query(call.id, "🚫 Verification failed. Please join all channels and try again.")
-      
+        
