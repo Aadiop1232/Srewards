@@ -571,7 +571,7 @@ def admin_callback_handler(bot, call):
         handle_admin_channel(bot, call)
     elif data == "admin_channel_add":
         handle_admin_channel_add(bot, call)
-        elif data == "admin_channel_remove":
+    elif data == "admin_channel_remove":
         handle_admin_channel_remove(bot, call)
     elif data.startswith("admin_channel_rm_"):
         channel_id = data.split("admin_channel_rm_")[1]
