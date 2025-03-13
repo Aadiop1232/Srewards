@@ -9,7 +9,7 @@ from handlers.referral import extract_referral_code, process_verified_referral, 
 from handlers.rewards import send_rewards_menu, handle_platform_selection, claim_account
 from handlers.account_info import send_account_info
 from handlers.review import prompt_review
-from handlers.admin import send_admin_menu, admin_callback_handler, generate_normal_key, generate_premium_key, add_key
+from handlers.admin import send_admin_menu, admin_callback_handler, generate_normal_key, generate_premium_key, add_key, is_admin
 
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
 init_db()
@@ -28,9 +28,7 @@ def start_command(message):
 
 @bot.message_handler(commands=["gen"])
 def gen_command(message):
-    user_id = str(message.from_user.id)
-    # is_admin now checks DB so only real admins/owners can generate keys
-    if not admin_callback_handler.is_admin(message.from_user):
+    if not is_admin(message.from_user):
         bot.reply_to(message, "🚫 You do not have permission to generate keys.")
         return
     parts = message.text.split()
@@ -82,8 +80,14 @@ def tutorial_command(message):
     )
     bot.send_message(message.chat.id, text, parse_mode="HTML")
 
+# When pressing "back_main", delete the old message and send a fresh main menu.
 @bot.callback_query_handler(func=lambda call: call.data == "back_main")
 def callback_back_main(call):
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception as e:
+        print("Error deleting message:", e)
+    from handlers.main_menu import send_main_menu
     send_main_menu(bot, call.message)
 
 @bot.callback_query_handler(func=lambda call: call.data == "get_ref_link")
@@ -106,7 +110,6 @@ def callback_claim(call):
     platform = call.data.split("claim_")[1]
     claim_account(bot, call, platform)
 
-# Pass the callback query (so that update.from_user is the real user)
 @bot.callback_query_handler(func=lambda call: call.data == "menu_account")
 def callback_menu_account(call):
     send_account_info(bot, call)
@@ -127,7 +130,6 @@ def callback_menu_admin(call):
 def callback_admin(call):
     admin_callback_handler(bot, call)
 
-# Updated verify callback: pass the bot instance to process_verified_referral
 @bot.callback_query_handler(func=lambda call: call.data == "verify")
 def callback_verify(call):
     handle_verification_callback(bot, call)
