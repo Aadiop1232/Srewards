@@ -3,6 +3,9 @@ from telebot import types
 from handlers.admin import is_admin
 
 def send_main_menu(bot, message):
+    """
+    Send the main menu to the user with options such as Rewards, Account Info, Referrals, and Admin Panel.
+    """
     user_obj = message.from_user
     markup = types.InlineKeyboardMarkup(row_width=3)
 
@@ -22,3 +25,4 @@ def send_main_menu(bot, message):
     
     # Send the main menu to the user
     bot.send_message(message.chat.id, "<b>📋 Main Menu 📋</b>\nPlease choose an option:", parse_mode="HTML", reply_markup=markup)
+    
