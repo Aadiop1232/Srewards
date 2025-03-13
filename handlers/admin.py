@@ -514,3 +514,71 @@ def process_admin_add_owner(bot, message):
     bot.send_message(message.chat.id, response, parse_mode="Markdown")
     send_admin_menu(bot, message)
 
+###############################
+# KEYS MANAGEMENT SUB-HANDLERS
+###############################
+def handle_admin_keys(bot, call):
+    keys = get_keys()
+    if not keys:
+        text = "😕 No keys generated."
+    else:
+        text = "<b>🔑 Keys:</b>\n"
+        for k in keys:
+            text += f"• {k[0]} | {k[1]} | Points: {k[2]} | Claimed: {k[3]} | By: {k[4]}\n"
+    bot.edit_message_text(text, chat_id=call.message.chat.id,
+                          message_id=call.message.message_id, parse_mode="Markdown")
+
+
+###############################
+# CALLBACK ROUTER
+###############################
+def admin_callback_handler(bot, call):
+    data = call.data
+    if not is_admin(call.from_user):
+        bot.answer_callback_query(call.id, "Access prohibited.")
+        return
+    if data == "admin_platform":
+        handle_admin_platform(bot, call)
+    elif data == "admin_platform_add":
+        handle_admin_platform_add(bot, call)
+    elif data == "admin_platform_remove":
+        handle_admin_platform_remove(bot, call)
+    elif data.startswith("admin_platform_rm_"):
+        platform = data.split("admin_platform_rm_")[1]
+        handle_admin_platform_rm(bot, call, platform)
+    elif data == "admin_stock":
+                handle_admin_stock(bot, call)
+    elif data.startswith("admin_stock_"):
+        platform = data.split("admin_stock_")[1]
+        handle_admin_stock_platform(bot, call, platform)
+    elif data == "admin_channel":
+        handle_admin_channel(bot, call)
+    elif data == "admin_channel_add":
+                handle_admin_channel_add(bot, call)
+    elif data == "admin_channel_remove":
+        handle_admin_channel_remove(bot, call)
+    elif data.startswith("admin_channel_rm_"):
+        channel_id = data.split("admin_channel_rm_")[1]
+        handle_admin_channel_rm(bot, call, channel_id)
+    elif data == "admin_manage":
+                handle_admin_manage(bot, call)
+    elif data == "admin_list":
+        handle_admin_list(bot, call)
+    elif data == "admin_ban_unban":
+        handle_admin_ban_unban(bot, call)
+    elif data == "admin_remove":
+        handle_admin_remove(bot, call)
+    elif data == "admin_add":
+                handle_admin_add(bot, call)
+    elif data == "admin_add_owner":
+        handle_admin_add_owner(bot, call)
+    elif data == "admin_users":
+        handle_user_ban_unban(bot, call)
+    elif data == "admin_keys":
+                handle_admin_keys(bot, call)
+    elif data == "back_main":
+        from handlers.main_menu import send_main_menu
+        send_main_menu(bot, call.message)
+    else:
+        bot.answer_callback_query(call.id, "❓ Unknown admin command.")
+        
