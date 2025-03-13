@@ -20,8 +20,7 @@ def send_account_info(bot, update):
         )
         user = get_user(telegram_id)
     
-    # Updated to use:
-    # user[0]: telegram_id, user[1]: username, user[2]: join_date, user[3]: points, user[4]: referrals
+    # Correct ordering: [0: telegram_id, 1: username, 2: join_date, 3: points, 4: referrals, 5: banned, 6: pending_referrer]
     text = (
         f"<b>👤 Account Info 😁</b>\n"
         f"• <b>Username:</b> {user[1]}\n"
