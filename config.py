@@ -1,12 +1,3 @@
-# config.py
-# Configuration file for the bot, including API token, admin and owner details.
-
-# The bot's API token (Replace with your actual bot token)
-TOKEN = "7760154469:AAEJxN6o8yOBULqY-5qMMvNCmSlkntJmz7Y"
-
-# The bot's username (Replace with your actual bot username)
-BOT_USERNAME = "ShadowRewardsBot"
-
 # List of owner IDs (these users have full control over the bot)
 OWNERS = [
     "5822279535",  # Replace with actual user IDs
@@ -28,4 +19,3 @@ REQUIRED_CHANNELS = [
     "https://t.me/Binhub_Originlabs",
     "https://t.me/ShadowsquadHits"
 ]
-
