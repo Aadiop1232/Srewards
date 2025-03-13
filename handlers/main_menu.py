@@ -3,8 +3,15 @@ import telebot
 from telebot import types
 from handlers.admin import is_admin
 
-def send_main_menu(bot, message):
-    user_obj = message.from_user
+def send_main_menu(bot, update):
+    # Allow update to be either a message or a callback query.
+    if hasattr(update, "data"):
+        user_obj = update.from_user
+        chat_id = update.message.chat.id
+    else:
+        user_obj = update.from_user
+        chat_id = update.chat.id
+
     markup = types.InlineKeyboardMarkup(row_width=3)
     btn_rewards = types.InlineKeyboardButton("💳 Rewards", callback_data="menu_rewards")
     btn_account = types.InlineKeyboardButton("👤 Account Info", callback_data="menu_account")
@@ -14,4 +21,5 @@ def send_main_menu(bot, message):
     if is_admin(user_obj):
         btn_admin = types.InlineKeyboardButton("🛠 Admin Panel", callback_data="menu_admin")
         markup.add(btn_admin)
-    bot.send_message(message.chat.id, "<b>📋 Main Menu 📋</b>\nPlease choose an option:", parse_mode="HTML", reply_markup=markup)
+    bot.send_message(chat_id, "<b>📋 Main Menu 📋</b>\nPlease choose an option:", parse_mode="HTML", reply_markup=markup)
+    
