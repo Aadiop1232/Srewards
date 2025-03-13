@@ -77,7 +77,7 @@ def add_platform(platform_name):
     try:
         conn = sqlite3.connect(config.DATABASE)
         c = conn.cursor()
-        c.execute("INSERT INTO platforms (platform_name, stock) VALUES (?, ?)", (platform_name, json.dumps([])))
+        c.execute("INSERT INTO platforms (platform_name, stock, platform_type) VALUES (?, ?, ?)", (platform_name, json.dumps([]), 'cookie'))  # Default platform type 'cookie'
         conn.commit()
         conn.close()
     except sqlite3.Error as e:
@@ -88,7 +88,7 @@ def get_platforms():
     try:
         conn = sqlite3.connect(config.DATABASE)
         c = conn.cursor()
-        c.execute("SELECT platform_name FROM platforms")
+        c.execute("SELECT platform_name, platform_type FROM platforms")
         rows = c.fetchall()
         conn.close()
         return rows
@@ -96,7 +96,7 @@ def get_platforms():
         print(f"❌ Error fetching platforms: {e}")
         return []
 
-# Function to handle user management in the admin panel
+# Handle user management in the admin panel
 def handle_admin_users(bot, call):
     users = get_users()  # Get all users from the database
     markup = types.InlineKeyboardMarkup(row_width=2)
@@ -107,6 +107,7 @@ def handle_admin_users(bot, call):
         user_id, username, banned = user
         status = "Banned" if banned else "Active"
         markup.add(types.InlineKeyboardButton(f"{username} ({status})", callback_data=f"admin_user_{user_id}"))
+    
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_admin"))
     bot.edit_message_text("<b>👥 Admin Panel - User Management</b>", chat_id=call.message.chat.id,
                           message_id=call.message.message_id, parse_mode="HTML", reply_markup=markup)
@@ -124,7 +125,7 @@ def get_user(user_id):
         print(f"❌ Error fetching user {user_id}: {e}")
         return None
 
-# Function to fetch all users
+# Fetch all users from the database
 def get_users():
     try:
         conn = sqlite3.connect(config.DATABASE)
@@ -159,36 +160,31 @@ def unban_user(user_id):
     except sqlite3.Error as e:
         print(f"❌ Error unbanning user: {e}")
 
-# Function to handle adding and removing admins
-def handle_admin_actions(bot, call):
-    markup = types.InlineKeyboardMarkup(row_width=2)
+# Handle key management in the admin panel
+def handle_admin_keys(bot, call):
+    """
+    Handles the admin key management section.
+    Allows admin to manage keys (generate, revoke, etc.)
+    """
+    markup = types.InlineKeyboardMarkup()
     markup.add(
-        types.InlineKeyboardButton("➕ Add Admin", callback_data="add_admin"),
-        types.InlineKeyboardButton("➖ Remove Admin", callback_data="remove_admin"),
-        types.InlineKeyboardButton("👤 Admin Info", callback_data="admin_info")
+        types.InlineKeyboardButton("🔑 Generate Key", callback_data="generate_key"),
+        types.InlineKeyboardButton("🛠 Revoke Key", callback_data="revoke_key")
     )
-    bot.edit_message_text("<b>🛠 Admin Panel - Admin Management</b>", chat_id=call.message.chat.id,
-                          message_id=call.message.message_id, parse_mode="HTML", reply_markup=markup)
+    bot.edit_message_text("Select an action for key management:", chat_id=call.message.chat.id,
+                          message_id=call.message.message_id, reply_markup=markup)
 
-# Function to add an admin
-def add_admin(user_id):
-    try:
-        conn = sqlite3.connect(config.DATABASE)
-        c = conn.cursor()
-        c.execute("INSERT OR REPLACE INTO admins (user_id, role) VALUES (?, ?)", (user_id, "admin"))
-        conn.commit()
-        conn.close()
-    except sqlite3.Error as e:
-        print(f"❌ Error adding admin: {e}")
-
-# Function to remove an admin
-def remove_admin(user_id):
-    try:
-        conn = sqlite3.connect(config.DATABASE)
-        c = conn.cursor()
-        c.execute("DELETE FROM admins WHERE user_id=?", (user_id,))
-        conn.commit()
-        conn.close()
-    except sqlite3.Error as e:
-        print(f"❌ Error removing admin: {e}")
-
+# Handle admin settings
+def handle_admin_settings(bot, call):
+    """
+    Handles admin settings.
+    Displays options for configuring bot settings.
+    """
+    markup = types.InlineKeyboardMarkup()
+    markup.add(
+        types.InlineKeyboardButton("🛠 Update Settings", callback_data="update_settings"),
+        types.InlineKeyboardButton("🔙 Back", callback_data="back_admin")
+    )
+    bot.edit_message_text("Admin Settings Menu:", chat_id=call.message.chat.id,
+                          message_id=call.message.message_id, reply_markup=markup)
+        
