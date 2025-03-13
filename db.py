@@ -301,4 +301,19 @@ def unban_admin(user_id):
         conn.close()
     except sqlite3.Error as e:
         print(f"❌ Error unbanning admin: {e}")
-            
+
+# Add review to the database
+def add_review(user_id, review_text):
+    """
+    Adds a review or suggestion from a user to the database.
+    """
+    try:
+        conn = sqlite3.connect(DATABASE)
+        c = conn.cursor()
+        c.execute("INSERT INTO reviews (user_id, review) VALUES (?, ?)", (user_id, review_text))
+        conn.commit()
+        conn.close()
+        print(f"✅ Review added by user {user_id}.")
+    except sqlite3.Error as e:
+        print(f"❌ Error adding review: {e}")
+    
