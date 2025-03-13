@@ -1,101 +1,85 @@
 import telebot
+from db import get_user, update_user_points
 from telebot import types
 import config
-from handlers.admin import is_admin
-from handlers.main_menu import send_main_menu
-
-def check_channel_membership(bot, user_id):
-    """Verify bot is admin and user is member in all channels"""
-    for channel in config.REQUIRED_CHANNELS:
-        try:
-            channel_username = channel.split("/")[-1]
-            chat = bot.get_chat(f"@{channel_username}")
-            
-            # Check bot admin status
-            bot_member = bot.get_chat_member(chat.id, bot.get_me().id)
-            if bot_member.status not in ["administrator", "creator"]:
-                print(f"Bot not admin in {channel}")
-                return False
-            
-            # Check user membership
-            user_member = bot.get_chat_member(chat.id, user_id)
-            if user_member.status not in ["member", "administrator", "creator"]:
-                return False
-                
-        except Exception as e:
-            print(f"Verification error: {e}")
-            return False
-    return True
 
 def send_verification_message(bot, message):
-    """Handle verification flow with proper message editing"""
-    user_id = message.from_user.id
-    
-    if is_admin(user_id):
-        try:
-            # Edit existing message if possible
-            bot.edit_message_text(
-                "✨ Admin/Owner Access Granted!",
-                message.chat.id,
-                message.message_id
-            )
-        except:
-            # Send new message if edit fails
-            bot.send_message(message.chat.id, "✨ Welcome back, Admin!")
-        
+    """
+    Send a verification message to the user and check if they have joined the required channels.
+    """
+    user_id = str(message.from_user.id)
+    user = get_user(user_id)
+
+    # Check if the user is already verified
+    if user and user[6]:  # Checking if the user has already passed verification
+        bot.send_message(message.chat.id, "✅ You are already verified!")
         send_main_menu(bot, message)
         return
+    
+    # Send instructions for verification
+    text = (
+        "🛑 Before you can start using the bot, please verify that you have joined the required channels.\n\n"
+        "👉 Please click the button below to verify. You must join the following channels to continue using the bot."
+    )
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("✅ Verify", callback_data="verify"))
 
-    if check_channel_membership(bot, user_id):
-        try:
-            bot.edit_message_text(
-                "✅ Verification Successful!",
-                message.chat.id,
-                message.message_id
-            )
-        except:
-            bot.send_message(message.chat.id, "✅ Verified!")
-        send_main_menu(bot, message)
-    else:
-        markup = types.InlineKeyboardMarkup()
-        for channel in config.REQUIRED_CHANNELS:
-            channel_username = channel.split("/")[-1]
-            markup.add(types.InlineKeyboardButton(
-                f"Join {channel_username}",
-                url=channel
-            ))
-        markup.add(types.InlineKeyboardButton("✅ Verify", callback_data="verify"))
-        
-        try:
-            bot.edit_message_text(
-                "🔒 Please join these channels to continue:",
-                message.chat.id,
-                message.message_id,
-                reply_markup=markup
-            )
-        except:
-            bot.send_message(
-                message.chat.id,
-                "🔒 Please join these channels to continue:",
-                reply_markup=markup
-            )
+    bot.send_message(message.chat.id, text, reply_markup=markup)
 
 def handle_verification_callback(bot, call):
-    """Handle verification button press"""
-    if check_channel_membership(bot, call.from_user.id):
-        try:
-            bot.edit_message_text(
-                "✅ Verification Successful!",
-                call.message.chat.id,
-                call.message.message_id
-            )
-        except:
-            bot.answer_callback_query(call.id, "✅ Verified!")
+    """
+    Handle the verification process by checking if the user has joined the required channels.
+    """
+    user_id = str(call.from_user.id)
+    user = get_user(user_id)
+    
+    if user and user[6]:  # Check if the user is already verified
+        bot.answer_callback_query(call.id, "You are already verified!")
+        return
+    
+    # Verify the channels the user has joined
+    try:
+        for channel in config.REQUIRED_CHANNELS:
+            status = bot.get_chat_member(channel, user_id).status
+            if status not in ["member", "administrator"]:
+                bot.answer_callback_query(call.id, f"You need to join the channel: {channel}")
+                return
+        
+        # Mark the user as verified
+        update_user_verified(user_id)
+        bot.answer_callback_query(call.id, "You are now verified! 🎉")
+
+        # Send the main menu after successful verification
         send_main_menu(bot, call.message)
-        process_verified_referral(call.from_user.id)
-    else:
-        bot.answer_callback_query(
-            call.id,
-            "❌ Join all channels first!",
-            show_alert=True
-        )
+
+    except Exception as e:
+        print(f"❌ Error verifying user {user_id}: {e}")
+        bot.answer_callback_query(call.id, "An error occurred while verifying. Please try again later.")
+
+def update_user_verified(user_id):
+    """
+    Mark the user as verified by setting their 'verified' status.
+    """
+    try:
+        conn = sqlite3.connect(config.DATABASE)
+        c = conn.cursor()
+        c.execute("UPDATE users SET pending_referrer=NULL WHERE telegram_id=?", (user_id,))
+        c.execute("UPDATE users SET verified=1 WHERE telegram_id=?", (user_id,))
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        print(f"❌ Error updating verification status: {e}")
+
+def send_main_menu(bot, message):
+    """
+    Send the main menu to the user after successful verification.
+    """
+    markup = types.InlineKeyboardMarkup(row_width=3)
+    btn_rewards = types.InlineKeyboardButton("💳 Rewards", callback_data="menu_rewards")
+    btn_account = types.InlineKeyboardButton("👤 Account Info", callback_data="menu_account")
+    btn_referral = types.InlineKeyboardButton("🔗 Referral System", callback_data="menu_referral")
+    btn_review = types.InlineKeyboardButton("💬 Review", callback_data="menu_review")
+
+    markup.add(btn_rewards, btn_account, btn_referral, btn_review)
+    bot.send_message(message.chat.id, "<b>📋 Main Menu 📋</b>\nPlease choose an option:", parse_mode="HTML", reply_markup=markup)
+        
