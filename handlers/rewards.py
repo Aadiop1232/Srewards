@@ -143,3 +143,4 @@ def process_stock_upload(bot, message, platform):
                      parse_mode="HTML")
     from handlers.admin import send_admin_menu
     send_admin_menu(bot, message)
+    
