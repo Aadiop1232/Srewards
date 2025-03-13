@@ -1,138 +1,119 @@
+# handlers/rewards.py
 import telebot
-from db import get_platforms, get_stock_for_platform, update_platform_stock, get_user, update_user_points
 from telebot import types
-import config
+import sqlite3
+import json
+import random
+import re
+from db import DATABASE, update_user_points, get_user
+
+def get_db_connection():
+    return sqlite3.connect(DATABASE)
+
+def get_platforms():
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT platform_name FROM platforms")
+    platforms = [row[0] for row in c.fetchall()]
+    conn.close()
+    return platforms
+
+def get_stock_for_platform(platform_name):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT stock FROM platforms WHERE platform_name=?", (platform_name,))
+    row = c.fetchone()
+    conn.close()
+    if row and row[0]:
+        try:
+            return json.loads(row[0])
+        except Exception:
+            return []
+    return []
+
+def update_stock_for_platform(platform_name, stock):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("UPDATE platforms SET stock=? WHERE platform_name=?", (json.dumps(stock), platform_name))
+    conn.commit()
+    conn.close()
 
 def send_rewards_menu(bot, message):
-    """
-    Send the available rewards menu to the user with buttons for each platform.
-    """
-    platforms = get_platforms()  # Get all platforms from the database
+    platforms = get_platforms()
+    markup = types.InlineKeyboardMarkup(row_width=2)
     if not platforms:
-        bot.send_message(message.chat.id, "❌ No platforms available. Please try again later.")
+        bot.send_message(message.chat.id, "😢 <b>No platforms available at the moment.</b>", parse_mode="HTML")
         return
-
-    markup = types.InlineKeyboardMarkup()
     for platform in platforms:
-        markup.add(types.InlineKeyboardButton(f"📺 {platform[0]}", callback_data=f"reward_{platform[0]}"))
-    
+        markup.add(types.InlineKeyboardButton(f"📺 {platform}", callback_data=f"reward_{platform}"))
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
-    
-    bot.send_message(message.chat.id, "<b>🎯 Available Rewards</b>", parse_mode="HTML", reply_markup=markup)
-
-def handle_platform_selection(bot, call, platform_name):
-    """
-    Handle the selection of a platform by the user.
-    Displays the available stock for the platform and allows the user to buy rewards.
-    """
-    stock = get_stock_for_platform(platform_name)
-    if not stock:
-        bot.edit_message_text(f"📺 {platform_name}\n\n❌ No stock available.", chat_id=call.message.chat.id, message_id=call.message.message_id)
-        return
-
-    available_count = len(stock)
-    text = f"📺 {platform_name}\n\nAvailable Stock: {available_count} items."
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton(f"🎁 Buy {platform_name} Reward", callback_data=f"buy_{platform_name}"))
-
-    bot.edit_message_text(text, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup)
-
-def claim_account(bot, call, platform_name):
-    """
-    Handle the process of claiming an account from the stock, checking if the user has enough points.
-    """
-    user_id = str(call.from_user.id)
-    user = get_user(user_id)
-    
-    if user is None:
-        bot.answer_callback_query(call.id, "❌ User not found.")
-        return
-
-    points = user[3]
-    required_points = 3  # Cost of an account in points
-    
-    if points < required_points:
-        bot.answer_callback_query(call.id, f"❌ Insufficient points. You need {required_points} points to buy an account.")
-        return
-
-    stock = get_stock_for_platform(platform_name)
-    if not stock:
-        bot.answer_callback_query(call.id, "❌ No stock available for this platform.")
-        return
-
-    account = stock.pop()  # Get the first account from the stock
-    new_points = points - required_points  # Deduct points for purchasing
-    update_user_points(user_id, new_points)  # Update user points in the database
-    update_platform_stock(platform_name, stock)  # Update platform stock in the database
-    
-    bot.answer_callback_query(call.id, "🎉 You successfully claimed an account!")
-    bot.send_message(call.message.chat.id, f"📺 {platform_name} Account:\n<code>{account}</code>\nRemaining Points: {new_points}", parse_mode="HTML")
-
-def claim_cookie(bot, call, platform_name):
-    """
-    Handle the process of claiming a cookie from the stock, checking if the user has enough points.
-    """
-    user_id = str(call.from_user.id)
-    user = get_user(user_id)
-    
-    if user is None:
-        bot.answer_callback_query(call.id, "❌ User not found.")
-        return
-
-    points = user[3]
-    required_points = 2  # Cost of a cookie in points
-    
-    if points < required_points:
-        bot.answer_callback_query(call.id, f"❌ Insufficient points. You need {required_points} points to buy a cookie.")
-        return
-
-    stock = get_stock_for_platform(platform_name)
-    if not stock:
-        bot.answer_callback_query(call.id, "❌ No stock available for this platform.")
-        return
-
-    cookie = stock.pop()  # Get the first cookie from the stock
-    new_points = points - required_points  # Deduct points for purchasing
-    update_user_points(user_id, new_points)  # Update user points in the database
-    update_platform_stock(platform_name, stock)  # Update platform stock in the database
-    
-    bot.answer_callback_query(call.id, "🎉 You successfully claimed a cookie!")
-    bot.send_message(call.message.chat.id, f"📺 {platform_name} Cookie:\n<code>{cookie}</code>\nRemaining Points: {new_points}", parse_mode="HTML")
-
-def handle_buy_reward(bot, call, platform_name):
-    """
-    Handle the reward purchase by the user. It checks if it's a cookie or an account, 
-    and proceeds accordingly with points validation and stock update.
-    """
-    user_id = str(call.from_user.id)
-    user = get_user(user_id)
-    
-    if user is None:
-        bot.answer_callback_query(call.id, "❌ User not found.")
-        return
-    
-    # Assuming the user has enough points (check if enough points are available)
-    points = user[3]
-    
-    # Different rewards have different costs (3 points for accounts, 2 points for cookies)
-    # You can add more logic here for different types of rewards if needed
-    if points >= 3:
-        claim_account(bot, call, platform_name)  # Handle claiming account
-    elif points >= 2:
-        claim_cookie(bot, call, platform_name)  # Handle claiming cookie
-    else:
-        bot.answer_callback_query(call.id, "❌ You don't have enough points to claim this reward.")
-
-def update_platform_stock(platform_name, stock):
-    """
-    Update the stock for a specific platform after a user claims a reward (account/cookie).
-    """
     try:
-        conn = sqlite3.connect(config.DATABASE)
-        c = conn.cursor()
-        c.execute("UPDATE platforms SET stock=? WHERE platform_name=?", (json.dumps(stock), platform_name))
-        conn.commit()
-        conn.close()
-    except sqlite3.Error as e:
-        print(f"❌ Error updating platform stock: {e}")
-    
+        bot.edit_message_text("<b>🎯 Available Platforms 🎯</b>", chat_id=message.chat.id,
+                              message_id=message.message_id, parse_mode="HTML", reply_markup=markup)
+    except Exception:
+        bot.send_message(message.chat.id, "<b>🎯 Available Platforms 🎯</b>", parse_mode="HTML", reply_markup=markup)
+
+def handle_platform_selection(bot, call, platform):
+    stock = get_stock_for_platform(platform)
+    if stock:
+        text = f"<b>📺 {platform}</b>:\n✅ <b>{len(stock)} accounts available!</b>"
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        markup.add(types.InlineKeyboardButton("🎁 Claim Account", callback_data=f"claim_{platform}"))
+    else:
+        text = f"<b>📺 {platform}</b>:\n😞 No accounts available at the moment."
+        markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="menu_rewards"))
+    bot.edit_message_text(text, chat_id=call.message.chat.id,
+                          message_id=call.message.message_id, parse_mode="HTML", reply_markup=markup)
+
+def claim_account(bot, call, platform):
+    user_id = str(call.from_user.id)
+    user = get_user(user_id)
+    if user is None:
+        bot.answer_callback_query(call.id, "User not found.")
+        return
+    try:
+        current_points = int(float(user[3]))
+    except Exception:
+        bot.answer_callback_query(call.id, "Error reading your points.")
+        return
+    if current_points < 2:
+        bot.answer_callback_query(call.id, "Insufficient points (each account costs 2 points). Earn more by referring or redeeming a key.")
+        return
+    stock = get_stock_for_platform(platform)
+    if not stock:
+        bot.answer_callback_query(call.id, "😞 No accounts available.")
+        return
+    index = random.randint(0, len(stock) - 1)
+    account = stock.pop(index)
+    update_stock_for_platform(platform, stock)
+    new_points = current_points - 2
+    update_user_points(user_id, new_points)
+    bot.answer_callback_query(call.id, "🎉 Account claimed!")
+    bot.send_message(call.message.chat.id,
+                     f"<b>Your account for {platform}:</b>\n<code>{account}</code>\nRemaining points: {new_points}",
+                     parse_mode="HTML")
+
+def process_stock_upload(bot, message, platform):
+    if message.content_type == "document":
+        try:
+            file_info = bot.get_file(message.document.file_id)
+            downloaded_file = bot.download_file(file_info.file_path)
+            data = downloaded_file.decode('utf-8')
+        except Exception as e:
+            bot.send_message(message.chat.id, f"❌ Error downloading file: {e}", parse_mode="HTML")
+            return
+    else:
+        data = message.text.strip()
+    pattern = r"((?:[\w\.-]+@[\w\.-]+\.\w+).*?)(?=(?:[\w\.-]+@[\w\.-]+\.\w+)|$)"
+    accounts = re.findall(pattern, data, flags=re.DOTALL)
+    accounts = [acct.strip() for acct in accounts if acct.strip()]
+    if not accounts:
+        accounts = [data]
+    update_stock_for_platform(platform, accounts)
+    bot.send_message(message.chat.id,
+                     f"✅ Stock for <b>{platform}</b> updated with {len(accounts)} accounts.",
+                     parse_mode="HTML")
+    from handlers.admin import send_admin_menu
+    send_admin_menu(bot, message)
+                              
