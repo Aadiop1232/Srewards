@@ -22,7 +22,8 @@ def init_db():
                 points INTEGER DEFAULT 20,
                 referrals INTEGER DEFAULT 0,
                 banned INTEGER DEFAULT 0,
-                pending_referrer TEXT
+                pending_referrer TEXT,
+                verified INTEGER DEFAULT 0
             )
         ''')
 
@@ -39,7 +40,8 @@ def init_db():
         c.execute('''
             CREATE TABLE IF NOT EXISTS platforms (
                 platform_name TEXT PRIMARY KEY,
-                stock TEXT
+                stock TEXT,
+                platform_type TEXT
             )
         ''')
 
@@ -113,9 +115,21 @@ def update_user_points(user_id, new_points):
         c.execute("UPDATE users SET points=? WHERE telegram_id=?", (new_points, user_id))
         conn.commit()
         conn.close()
-        print(f"✅ Points for user {user_id} updated to {new_points}.")
     except sqlite3.Error as e:
         print(f"❌ Error updating points for user {user_id}: {e}")
+
+def update_user_verified(user_id):
+    """
+    Mark the user as verified by setting their 'verified' status.
+    """
+    try:
+        conn = sqlite3.connect(DATABASE)
+        c = conn.cursor()
+        c.execute("UPDATE users SET verified=1 WHERE telegram_id=?", (user_id,))
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        print(f"❌ Error updating verification status for {user_id}: {e}")
 
 
 # Functions for handling referrals
@@ -126,9 +140,9 @@ def add_referral(referrer_id, referred_id):
         c.execute("SELECT * FROM referrals WHERE referred_id=?", (referred_id,))
         if c.fetchone():
             conn.close()
-            return
+            return  # Skip if the referred user is already recorded
         c.execute("INSERT INTO referrals (user_id, referred_id) VALUES (?, ?)", (referrer_id, referred_id))
-        c.execute("UPDATE users SET points = points + 4, referrals = referrals + 1 WHERE telegram_id=?", (referrer_id,))
+        c.execute("UPDATE users SET points = points + 5 WHERE telegram_id=?", (referrer_id,))
         conn.commit()
         conn.close()
     except sqlite3.Error as e:
@@ -140,7 +154,7 @@ def get_platforms():
     try:
         conn = sqlite3.connect(DATABASE)
         c = conn.cursor()
-        c.execute("SELECT platform_name FROM platforms")
+        c.execute("SELECT platform_name, platform_type FROM platforms")
         rows = c.fetchall()
         conn.close()
         return rows
@@ -148,11 +162,11 @@ def get_platforms():
         print(f"❌ Error fetching platforms: {e}")
         return []
 
-def add_platform(platform_name):
+def add_platform(platform_name, platform_type):
     try:
         conn = sqlite3.connect(DATABASE)
         c = conn.cursor()
-        c.execute("INSERT INTO platforms (platform_name, stock) VALUES (?, ?)", (platform_name, json.dumps([])))
+        c.execute("INSERT INTO platforms (platform_name, stock, platform_type) VALUES (?, ?, ?)", (platform_name, json.dumps([]), platform_type))
         conn.commit()
         conn.close()
     except sqlite3.Error as e:
@@ -168,7 +182,7 @@ def remove_platform(platform_name):
     except sqlite3.Error as e:
         print(f"❌ Error removing platform: {e}")
 
-def update_stock_for_platform(platform_name, stock):
+def update_platform_stock(platform_name, stock):
     """
     Update the stock for a specific platform in the database.
     """
@@ -183,7 +197,7 @@ def update_stock_for_platform(platform_name, stock):
 
 def get_stock_for_platform(platform_name):
     """
-    Retrieve the stock (list of accounts) for a specific platform.
+    Retrieve the stock (list of accounts or cookies) for a specific platform.
     """
     try:
         conn = sqlite3.connect(DATABASE)
@@ -246,74 +260,4 @@ def claim_key_in_db(key, user_id):
     except sqlite3.Error as e:
         print(f"❌ Error claiming key: {e}")
         return "An error occurred while claiming the key."
-
-
-# Functions for managing admins
-def get_admins():
-    try:
-        conn = sqlite3.connect(DATABASE)
-        c = conn.cursor()
-        c.execute("SELECT user_id, username, role, banned FROM admins")
-        rows = c.fetchall()
-        conn.close()
-        return rows
-    except sqlite3.Error as e:
-        print(f"❌ Error fetching admins: {e}")
-        return []
-
-def add_admin(user_id, username, role="admin"):
-    try:
-        conn = sqlite3.connect(DATABASE)
-        c = conn.cursor()
-        c.execute("INSERT OR REPLACE INTO admins (user_id, username, role, banned) VALUES (?, ?, ?, 0)", 
-                  (str(user_id), username, role))
-        conn.commit()
-        conn.close()
-    except sqlite3.Error as e:
-        print(f"❌ Error adding admin: {e}")
-
-def remove_admin(user_id):
-    try:
-        conn = sqlite3.connect(DATABASE)
-        c = conn.cursor()
-        c.execute("DELETE FROM admins WHERE user_id=?", (str(user_id),))
-        conn.commit()
-        conn.close()
-    except sqlite3.Error as e:
-        print(f"❌ Error removing admin: {e}")
-
-def ban_admin(user_id):
-    try:
-        conn = sqlite3.connect(DATABASE)
-        c = conn.cursor()
-        c.execute("UPDATE admins SET banned=1 WHERE user_id=?", (str(user_id),))
-        conn.commit()
-        conn.close()
-    except sqlite3.Error as e:
-        print(f"❌ Error banning admin: {e}")
-
-def unban_admin(user_id):
-    try:
-        conn = sqlite3.connect(DATABASE)
-        c = conn.cursor()
-        c.execute("UPDATE admins SET banned=0 WHERE user_id=?", (str(user_id),))
-        conn.commit()
-        conn.close()
-    except sqlite3.Error as e:
-        print(f"❌ Error unbanning admin: {e}")
-
-# Add review to the database
-def add_review(user_id, review_text):
-    """
-    Adds a review or suggestion from a user to the database.
-    """
-    try:
-        conn = sqlite3.connect(DATABASE)
-        c = conn.cursor()
-        c.execute("INSERT INTO reviews (user_id, review) VALUES (?, ?)", (user_id, review_text))
-        conn.commit()
-        conn.close()
-        print(f"✅ Review added by user {user_id}.")
-    except sqlite3.Error as e:
-        print(f"❌ Error adding review: {e}")
     
