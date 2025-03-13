@@ -73,9 +73,8 @@ def claim_account(bot, call, platform):
         bot.answer_callback_query(call.id, "User not found.")
         return
     try:
-        # Debug: print raw points value to troubleshoot type issues
-        print("User points raw value:", user[3], type(user[3]))
-        current_points = int(user[3])
+        # Use strip() to remove any extraneous characters
+        current_points = int(str(user[3]).strip())
     except Exception as e:
         bot.answer_callback_query(call.id, f"Error reading your points: {e}")
         return
@@ -118,4 +117,4 @@ def process_stock_upload(bot, message, platform):
                      parse_mode="HTML")
     from handlers.admin import send_admin_menu
     send_admin_menu(bot, message)
-            
+    
