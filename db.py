@@ -1,4 +1,3 @@
-# db.py
 import sqlite3
 
 DATABASE = "bot.db"
@@ -6,7 +5,7 @@ DATABASE = "bot.db"
 def init_db():
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    # Users table: stores Telegram ID, username, join date, points, referrals, banned flag, pending_referrer
+ 
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             telegram_id TEXT PRIMARY KEY,
@@ -18,7 +17,7 @@ def init_db():
             pending_referrer TEXT
         )
     ''')
-    # Referrals table
+
     c.execute('''
         CREATE TABLE IF NOT EXISTS referrals (
             user_id TEXT,
@@ -26,14 +25,14 @@ def init_db():
             PRIMARY KEY (user_id, referred_id)
         )
     ''')
-    # Platforms table: platform name and JSON-encoded stock
+   
     c.execute('''
         CREATE TABLE IF NOT EXISTS platforms (
             platform_name TEXT PRIMARY KEY,
             stock TEXT
         )
     ''')
-    # Reviews table
+ 
     c.execute('''
         CREATE TABLE IF NOT EXISTS reviews (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,7 +41,7 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    # Admin logs table
+ 
     c.execute('''
         CREATE TABLE IF NOT EXISTS admin_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,14 +50,14 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    # Channels table
+  
     c.execute('''
         CREATE TABLE IF NOT EXISTS channels (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             channel_link TEXT
         )
     ''')
-    # Admins table
+ 
     c.execute('''
         CREATE TABLE IF NOT EXISTS admins (
             user_id TEXT PRIMARY KEY,
@@ -67,7 +66,7 @@ def init_db():
             banned INTEGER DEFAULT 0
         )
     ''')
-    # Keys table
+  
     c.execute('''
         CREATE TABLE IF NOT EXISTS keys (
             key TEXT PRIMARY KEY,
@@ -92,8 +91,8 @@ def add_user(telegram_id, username, join_date, pending_referrer=None):
 def get_user(telegram_id):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    # Explicitly select columns in the desired order:
-    # [telegram_id, username, join_date, points, referrals, banned, pending_referrer]
+    
+ 
     c.execute("SELECT telegram_id, username, join_date, points, referrals, banned, pending_referrer FROM users WHERE telegram_id=?", (telegram_id,))
     user = c.fetchone()
     conn.close()
@@ -172,7 +171,6 @@ def update_user_points(telegram_id, points):
     conn.commit()
     conn.close()
 
-# New functions added for banning and unbanning users
 def ban_user(telegram_id):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
