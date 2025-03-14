@@ -184,8 +184,6 @@ def is_admin(user_or_id):
     return True if row else False
 
 def send_admin_menu(bot, update):
-    # If update is a Message, it has chat, message_id, and from_user attributes.
-    # If it's a CallbackQuery, then update.message holds the message.
     if hasattr(update, 'message_id'):
         chat_id = update.chat.id
         message_id = update.message_id
@@ -196,7 +194,7 @@ def send_admin_menu(bot, update):
         user_obj = update.from_user
 
     markup = types.InlineKeyboardMarkup(row_width=2)
-    # All admin functions are shown:
+    
     markup.add(
         types.InlineKeyboardButton("📺 Platform Mgmt", callback_data="admin_platform"),
         types.InlineKeyboardButton("📈 Stock Mgmt", callback_data="admin_stock"),
