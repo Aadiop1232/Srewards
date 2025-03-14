@@ -1,4 +1,3 @@
-# handlers/review.py
 import telebot
 from db import add_review
 import config
