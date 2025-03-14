@@ -1,4 +1,3 @@
-# main.py
 import telebot
 import config
 from datetime import datetime
@@ -88,7 +87,7 @@ def callback_back_main(call):
     except Exception as e:
         print("Error deleting message:", e)
     from handlers.main_menu import send_main_menu
-    send_main_menu(bot, call.message)
+    send_main_menu(bot, call)
 
 @bot.callback_query_handler(func=lambda call: call.data == "get_ref_link")
 def callback_get_ref_link(call):
@@ -124,7 +123,7 @@ def callback_menu_review(call):
 
 @bot.callback_query_handler(func=lambda call: call.data == "menu_admin")
 def callback_menu_admin(call):
-    send_admin_menu(bot, call.message)
+    send_admin_menu(bot, call)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("admin"))
 def callback_admin(call):
@@ -136,4 +135,3 @@ def callback_verify(call):
     process_verified_referral(call.from_user.id, bot)
 
 bot.polling(none_stop=True)
-    
