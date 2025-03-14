@@ -160,16 +160,16 @@ def claim_key_in_db(key, user_id):
     row = c.fetchone()
     if not row:
         conn.close()
-        return "Key not found."
+        return "🌚 Key not found."
     if row[0] != 0:
         conn.close()
-        return "Key already claimed."
+        return "🥲 Key already claimed."
     points = row[2]
     c.execute("UPDATE keys SET claimed=1, claimed_by=? WHERE key=?", (user_id, key))
     c.execute("UPDATE users SET points = points + ? WHERE telegram_id=?", (points, user_id))
     conn.commit()
     conn.close()
-    return f"Key redeemed successfully. You've been awarded {points} points."
+    return f"✅ Key redeemed successfully. You've been awarded {points} points."
 
 ###############################
 # ADMIN PANEL HANDLERS & SECURITY
@@ -257,18 +257,18 @@ def process_platform_add(bot, message):
 def handle_admin_platform_remove(bot, call):
     platforms = get_platforms()
     if not platforms:
-        bot.answer_callback_query(call.id, "No platforms to remove.")
+        bot.answer_callback_query(call.id, "😒 No platforms to remove.")
         return
     markup = types.InlineKeyboardMarkup(row_width=2)
     for plat in platforms:
         markup.add(types.InlineKeyboardButton(plat, callback_data=f"admin_platform_rm_{plat}"))
-    markup.add(types.InlineKeyboardButton("ðŸ”™ Back", callback_data="admin_platform"))
-    bot.edit_message_text("Select a platform to remove:", chat_id=call.message.chat.id,
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_platform"))
+    bot.edit_message_text("👇🏼 Select a platform to remove:", chat_id=call.message.chat.id,
                           message_id=call.message.message_id, reply_markup=markup)
 
 def handle_admin_platform_rm(bot, call, platform):
     remove_platform(platform)
-    bot.answer_callback_query(call.id, f"Platform '{platform}' removed.")
+    bot.answer_callback_query(call.id, f"🍆 Platform '{platform}' removed.")
     handle_admin_platform(bot, call)
 
 ###############################
@@ -277,7 +277,7 @@ def handle_admin_platform_rm(bot, call, platform):
 def handle_admin_stock(bot, call):
     platforms = get_platforms()
     if not platforms:
-        bot.answer_callback_query(call.id, "No platforms available. Add one first.")
+        bot.answer_callback_query(call.id, "🍆 You Gay No platforms available. Add one first.")
         return
     markup = types.InlineKeyboardMarkup(row_width=2)
     for plat in platforms:
@@ -287,7 +287,7 @@ def handle_admin_stock(bot, call):
                           message_id=call.message.message_id, reply_markup=markup)
 
 def handle_admin_stock_platform(bot, call, platform):
-    msg = bot.send_message(call.message.chat.id, f"âœï¸ Send the stock text for platform {platform} (type or attach a .txt file):")
+    msg = bot.send_message(call.message.chat.id, f"🙇🏼‍♀️ Send the stock text for platform {platform} (type or attach a .txt file):")
     bot.register_next_step_handler(msg, process_stock_upload, platform)
 
 def process_stock_upload(message, platform):
@@ -320,7 +320,7 @@ def process_stock_upload(message, platform):
         accounts.append(current_account.strip())
     add_stock_to_platform(platform, accounts)
     bot_instance.send_message(message.chat.id,
-                              f"Stock for {platform} updated with {len(accounts)} accounts.")
+                              f"✅ Stock for {platform} updated with {len(accounts)} accounts.")
     from handlers.admin import send_admin_menu
     send_admin_menu(bot_instance, message)
 
@@ -329,7 +329,7 @@ def process_stock_upload(message, platform):
 ###############################
 def handle_admin_channel(bot, call):
     if not is_owner(call.from_user.id):
-        bot.answer_callback_query(call.id, "Access prohibited. Only owners can manage channels.")
+        bot.answer_callback_query(call.id, "❌ Access prohibited. Only owners can manage channels.")
         return
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
@@ -355,7 +355,7 @@ def process_channel_add(bot, message):
         c.execute("INSERT INTO channels (channel_link) VALUES (?)", (channel_link,))
         conn.commit()
         conn.close()
-        response = f"Channel '{channel_link}' added successfully."
+        response = f"✅ Channel '{channel_link}' added successfully."
     except Exception as e:
         response = f"Error adding channel: {e}"
     bot.send_message(message.chat.id, response)
@@ -372,13 +372,13 @@ def handle_admin_channel_remove(bot, call):
     markup = types.InlineKeyboardMarkup(row_width=1)
     for cid, link in channels:
         markup.add(types.InlineKeyboardButton(link, callback_data=f"admin_channel_rm_{cid}"))
-    markup.add(types.InlineKeyboardButton("ðŸ”™ Back", callback_data="admin_channel"))
-    bot.edit_message_text("Select a channel to remove:", chat_id=call.message.chat.id,
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_channel"))
+    bot.edit_message_text("🙌🏼 Select a channel to remove:", chat_id=call.message.chat.id,
                           message_id=call.message.message_id, reply_markup=markup)
 
 def handle_admin_channel_rm(bot, call, channel_id):
     remove_channel(channel_id)
-    bot.answer_callback_query(call.id, "Channel removed.")
+    bot.answer_callback_query(call.id, "✅ Channel removed.")
     handle_admin_channel(bot, call)
 
 ###############################
@@ -423,7 +423,7 @@ def process_admin_ban_unban(bot, message):
     c.execute("SELECT banned FROM admins WHERE user_id=?", (user_id,))
     row = c.fetchone()
     if row is None:
-        response = "Admin not found."
+        response = "😮‍💨 Admin not found."
     else:
         if row[0] == 0:
             ban_admin(user_id)
@@ -470,7 +470,7 @@ def process_admin_add(bot, message):
         add_admin(user_id, username, role="admin")
         response = f"✅ Admin {user_id} added with username {username}."
         try:
-            bot.send_message(user_id, "❌ You have been added as an admin.")
+            bot.send_message(user_id, "💫 You have been added as an admin.")
         except Exception as e:
             print(f"Error notifying new admin: {e}")
     bot.send_message(message.chat.id, response)
