@@ -6,7 +6,7 @@ def send_main_menu(bot, update):
     if hasattr(update, "message"):
         chat_id = update.message.chat.id
         user_obj = update.from_user
-    elif hasattr(update, "data"):  # Callback query
+    elif hasattr(update, "data"):
         chat_id = update.message.chat.id
         user_obj = update.from_user
     elif hasattr(update, "chat"):
