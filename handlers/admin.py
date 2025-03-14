@@ -474,21 +474,36 @@ def handle_user_management_detail(bot, call, user_id):
     if not user:
         bot.answer_callback_query(call.id, "User not found.")
         return
+    # Order: [telegram_id, username, join_date, points, referrals, banned, pending_referrer]
     status = "Banned" if user[5] else "Active"
-    text = (f"User Management\n\n"
-            f"User ID: {user[0]}\n"
-            f"Username: {user[1]}\n"
-            f"Join Date: {user[2]}\n"
-            f"Balance: {user[3]} points\n"
-            f"Total Referrals: {user[4]}\n"
-            f"Status: {status}")
+    text = (
+        f"User Management\n\n"
+        f"User ID: {user[0]}\n"
+        f"Username: {user[1]}\n"
+        f"Join Date: {user[2]}\n"
+        f"Balance: {user[3]} points\n"
+        f"Total Referrals: {user[4]}\n"
+        f"Status: {status}"
+    )
     markup = types.InlineKeyboardMarkup(row_width=2)
     if user[5]:
         markup.add(types.InlineKeyboardButton("Unban", callback_data=f"user_{user_id}_unban"))
     else:
         markup.add(types.InlineKeyboardButton("Ban", callback_data=f"user_{user_id}_ban"))
-    markup.add(types.InlineKeyboardButton("ðŸ”™ Back", callback_data="admin_users"))
-    bot.edit_message_text(text, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup)
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_users"))
+    
+    bot.answer_callback_query(call.id)  # Acknowledge the callback
+    try:
+        bot.edit_message_text(
+            text,
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=markup
+        )
+    except Exception as e:
+        # If editing fails, send a new message instead
+        bot.send_message(call.message.chat.id, text, reply_markup=markup)
+
 
 def handle_user_ban_action(bot, call, user_id, action):
     if action == "ban":
