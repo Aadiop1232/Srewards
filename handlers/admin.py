@@ -198,34 +198,33 @@ def is_admin(user_or_id):
     return True if row else False
 
 def send_admin_menu(bot, update):
-    # Determine chat_id, message_id, and user correctly for both messages and callback queries
-    if hasattr(update, "message"):
-        chat_id = update.message.chat.id
-        message_id = update.message.message_id
-        user_obj = update.from_user
-    elif hasattr(update, "data"):
-        chat_id = update.message.chat.id
-        message_id = update.message.message_id
+    # If update is a Message, it has chat, message_id, and from_user attributes.
+    # If it's a CallbackQuery, then update.message holds the message.
+    if hasattr(update, 'message_id'):
+        chat_id = update.chat.id
+        message_id = update.message_id
         user_obj = update.from_user
     else:
-        chat_id = update.chat.id
+        chat_id = update.message.chat.id
         message_id = update.message.message_id
         user_obj = update.from_user
+
     markup = types.InlineKeyboardMarkup(row_width=2)
     # All admin functions are shown:
     markup.add(
         types.InlineKeyboardButton("📺 Platform Mgmt", callback_data="admin_platform"),
-        types.InlineKeyboardButton("🌐 Stock Mgmt", callback_data="admin_stock"),
-        types.InlineKeyboardButton("📸 — Channel Mgmt", callback_data="admin_channel"),
-        types.InlineKeyboardButton("🔗 Admin Mgmt", callback_data="admin_manage"),
-        types.InlineKeyboardButton("🫂 User Mgmt", callback_data="admin_users"),
+        types.InlineKeyboardButton("📈 Stock Mgmt", callback_data="admin_stock"),
+        types.InlineKeyboardButton("🔗 Channel Mgmt", callback_data="admin_channel"),
+        types.InlineKeyboardButton("👥 Admin Mgmt", callback_data="admin_manage"),
+        types.InlineKeyboardButton("👤 User Mgmt", callback_data="admin_users"),
         types.InlineKeyboardButton("➕ Add Admin", callback_data="admin_add")
     )
     markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
     try:
-        bot.edit_message_text("🛠️  Admin Panel", chat_id=chat_id, message_id=message_id, reply_markup=markup)
+        bot.edit_message_text("🛠 Admin Panel", chat_id=chat_id, message_id=message_id, reply_markup=markup)
     except Exception:
-        bot.send_message(chat_id, "ðŸ›  Admin Panel", reply_markup=markup)
+        bot.send_message(chat_id, "🛠 Admin Panel", reply_markup=markup)
+
 
 ###############################
 # PLATFORM SUB-HANDLERS
