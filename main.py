@@ -1,4 +1,3 @@
-# main.py
 import telebot
 import config
 from datetime import datetime
@@ -39,7 +38,7 @@ def gen_command(message):
     try:
         qty = int(parts[2])
     except ValueError:
-        bot.reply_to(message, "Quantity must be a number.")
+        bot.reply_to(message, "😒 Quantity must be a number.")
         return
     generated = []
     if key_type == "normal":
@@ -80,7 +79,6 @@ def tutorial_command(message):
     )
     bot.send_message(message.chat.id, text, parse_mode="HTML")
 
-# When pressing "back_main", delete the old message and send a fresh main menu.
 @bot.callback_query_handler(func=lambda call: call.data == "back_main")
 def callback_back_main(call):
     try:
