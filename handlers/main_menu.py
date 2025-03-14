@@ -1,10 +1,8 @@
-# handlers/main_menu.py
 import telebot
 from telebot import types
 from handlers.admin import is_admin
 
 def send_main_menu(bot, update):
-    # Determine chat_id and user object correctly for both messages and callback queries
     if hasattr(update, "message"):
         chat_id = update.message.chat.id
         user_obj = update.from_user
