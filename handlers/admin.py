@@ -474,7 +474,6 @@ def handle_user_management_detail(bot, call, user_id):
     if not user:
         bot.answer_callback_query(call.id, "User not found.", show_alert=True)
         return
-    # Order: [telegram_id, username, join_date, points, referrals, banned, pending_referrer]
     status = "Banned" if user[5] else "Active"
     text = (
         f"User Management\n\n"
@@ -492,13 +491,11 @@ def handle_user_management_detail(bot, call, user_id):
         markup.add(types.InlineKeyboardButton("Ban", callback_data=f"user_{user_id}_ban"))
     markup.add(types.InlineKeyboardButton("Back", callback_data="admin_users"))
     
-    # Answer the callback query to stop the loading indicator
+
     try:
         bot.answer_callback_query(call.id, "User details loaded.")
     except Exception as e:
         print("Error answering callback:", e)
-    
-    # Attempt to edit the existing message; if that fails, send a new message.
     try:
         bot.edit_message_text(
             text,
