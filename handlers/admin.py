@@ -472,7 +472,7 @@ def handle_user_management(bot, call):
 def handle_user_management_detail(bot, call, user_id):
     user = get_user(user_id)
     if not user:
-        bot.answer_callback_query(call.id, "User not found.")
+        bot.answer_callback_query(call.id, "User not found.", show_alert=True)
         return
     # Order: [telegram_id, username, join_date, points, referrals, banned, pending_referrer]
     status = "Banned" if user[5] else "Active"
@@ -490,9 +490,15 @@ def handle_user_management_detail(bot, call, user_id):
         markup.add(types.InlineKeyboardButton("Unban", callback_data=f"user_{user_id}_unban"))
     else:
         markup.add(types.InlineKeyboardButton("Ban", callback_data=f"user_{user_id}_ban"))
-    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_users"))
+    markup.add(types.InlineKeyboardButton("Back", callback_data="admin_users"))
     
-    bot.answer_callback_query(call.id)  # Acknowledge the callback
+    # Answer the callback query to stop the loading indicator
+    try:
+        bot.answer_callback_query(call.id, "User details loaded.")
+    except Exception as e:
+        print("Error answering callback:", e)
+    
+    # Attempt to edit the existing message; if that fails, send a new message.
     try:
         bot.edit_message_text(
             text,
@@ -501,7 +507,7 @@ def handle_user_management_detail(bot, call, user_id):
             reply_markup=markup
         )
     except Exception as e:
-        # If editing fails, send a new message instead
+        print("Edit message error:", e)
         bot.send_message(call.message.chat.id, text, reply_markup=markup)
 
 
