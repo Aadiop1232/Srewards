@@ -92,7 +92,9 @@ def add_user(telegram_id, username, join_date, pending_referrer=None):
 def get_user(telegram_id):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE telegram_id=?", (telegram_id,))
+    # Explicitly select columns in the desired order:
+    # [telegram_id, username, join_date, points, referrals, banned, pending_referrer]
+    c.execute("SELECT telegram_id, username, join_date, points, referrals, banned, pending_referrer FROM users WHERE telegram_id=?", (telegram_id,))
     user = c.fetchone()
     conn.close()
     return user
@@ -188,4 +190,3 @@ def unban_user(telegram_id):
 if __name__ == '__main__':
     init_db()
     print("✅ Database initialized!")
-    
