@@ -1,4 +1,3 @@
-# handlers/verification.py
 import telebot
 from telebot import types
 import config
