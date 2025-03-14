@@ -1,4 +1,3 @@
-# handlers/rewards.py
 import telebot
 from telebot import types
 import sqlite3
@@ -73,7 +72,6 @@ def claim_account(bot, call, platform):
         bot.send_message(call.message.chat.id, "User not found.")
         return
     try:
-        # Use the points from index 3 (correct order)
         points_str = str(user[3]).strip().split()[0]
         current_points = int(points_str)
     except Exception as e:
