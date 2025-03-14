@@ -1,4 +1,3 @@
-# handlers/admin.py
 import telebot
 from telebot import types
 import sqlite3
@@ -9,9 +8,6 @@ from db import DATABASE, log_admin_action, get_user, ban_user, unban_user
 def get_db_connection():
     return sqlite3.connect(getattr(config, "DATABASE", "bot.db"))
 
-###############################
-# PLATFORM MANAGEMENT FUNCTIONS
-###############################
 def add_platform(platform_name):
     conn = get_db_connection()
     c = conn.cursor()
@@ -53,9 +49,7 @@ def add_stock_to_platform(platform_name, accounts):
     conn.commit()
     conn.close()
 
-###############################
-# CHANNEL MANAGEMENT FUNCTIONS
-###############################
+
 def get_channels():
     conn = get_db_connection()
     c = conn.cursor()
@@ -78,9 +72,7 @@ def remove_channel(channel_id):
     conn.commit()
     conn.close()
 
-###############################
-# ADMINS MANAGEMENT FUNCTIONS
-###############################
+
 def get_admins():
     conn = get_db_connection()
     c = conn.cursor()
@@ -118,9 +110,7 @@ def unban_admin(user_id):
     conn.commit()
     conn.close()
 
-###############################
-# USERS MANAGEMENT FUNCTIONS
-###############################
+
 def get_users():
     conn = get_db_connection()
     c = conn.cursor()
@@ -129,9 +119,7 @@ def get_users():
     conn.close()
     return rows
 
-###############################
-# KEYS MANAGEMENT FUNCTIONS
-###############################
+
 def generate_normal_key():
     return "NKEY-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
 
@@ -171,9 +159,7 @@ def claim_key_in_db(key, user_id):
     conn.close()
     return f"✅ Key redeemed successfully. You've been awarded {points} points."
 
-###############################
-# ADMIN PANEL HANDLERS & SECURITY
-###############################
+
 def is_owner(user_or_id):
     if user_or_id is None:
         return False
@@ -226,9 +212,7 @@ def send_admin_menu(bot, update):
         bot.send_message(chat_id, "🛠 Admin Panel", reply_markup=markup)
 
 
-###############################
-# PLATFORM SUB-HANDLERS
-###############################
+
 def handle_admin_platform(bot, call):
     platforms = get_platforms()
     markup = types.InlineKeyboardMarkup(row_width=2)
@@ -250,7 +234,7 @@ def process_platform_add(bot, message):
     if error:
         response = f"Error adding platform: {error}"
     else:
-        response = f"Platform '{platform_name}' added successfully!"
+        response = f"✅ Platform '{platform_name}' added successfully!"
     bot.send_message(message.chat.id, response)
     send_admin_menu(bot, message)
 
@@ -271,9 +255,7 @@ def handle_admin_platform_rm(bot, call, platform):
     bot.answer_callback_query(call.id, f"🍆 Platform '{platform}' removed.")
     handle_admin_platform(bot, call)
 
-###############################
-# STOCK SUB-HANDLERS
-###############################
+
 def handle_admin_stock(bot, call):
     platforms = get_platforms()
     if not platforms:
@@ -324,9 +306,7 @@ def process_stock_upload(message, platform):
     from handlers.admin import send_admin_menu
     send_admin_menu(bot_instance, message)
 
-###############################
-# CHANNEL SUB-HANDLERS (Owners Only)
-###############################
+
 def handle_admin_channel(bot, call):
     if not is_owner(call.from_user.id):
         bot.answer_callback_query(call.id, "❌ Access prohibited. Only owners can manage channels.")
@@ -381,9 +361,7 @@ def handle_admin_channel_rm(bot, call, channel_id):
     bot.answer_callback_query(call.id, "✅ Channel removed.")
     handle_admin_channel(bot, call)
 
-###############################
-# ADMIN MANAGEMENT (Owners Only)
-###############################
+
 def handle_admin_manage(bot, call):
     if not is_owner(call.from_user.id):
         bot.answer_callback_query(call.id, "❌ Access prohibited. Only owners can manage admins.")
@@ -476,9 +454,7 @@ def process_admin_add(bot, message):
     bot.send_message(message.chat.id, response)
     send_admin_menu(bot, message)
 
-###############################
-# USER MANAGEMENT SUB-HANDLERS
-###############################
+
 def handle_user_management(bot, call):
     users = get_users()
     if not users:
@@ -500,7 +476,6 @@ def handle_user_management_detail(bot, call, user_id):
     if not user:
         bot.answer_callback_query(call.id, "User not found.")
         return
-    # Order: [telegram_id, username, join_date, points, referrals, banned, pending_referrer]
     status = "Banned" if user[5] else "Active"
     text = (f"User Management\n\n"
             f"User ID: {user[0]}\n"
@@ -529,9 +504,7 @@ def handle_user_ban_action(bot, call, user_id, action):
     bot.answer_callback_query(call.id, text)
     handle_user_management_detail(bot, call, user_id)
 
-###############################
-# CALLBACK ROUTER
-###############################
+
 def admin_callback_handler(bot, call):
     data = call.data
     if not is_admin(call.from_user):
