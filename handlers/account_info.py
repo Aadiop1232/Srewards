@@ -1,4 +1,3 @@
-# handlers/account_info.py
 from db import get_user, add_user
 from datetime import datetime
 
@@ -19,8 +18,6 @@ def send_account_info(bot, update):
             datetime.now().strftime("%Y-%m-%d")
         )
         user = get_user(telegram_id)
-    
-    # Correct ordering: [0: telegram_id, 1: username, 2: join_date, 3: points, 4: referrals, 5: banned, 6: pending_referrer]
     text = (
         f"<b>👤 Account Info 😁</b>\n"
         f"• <b>Username:</b> {user[1]}\n"
