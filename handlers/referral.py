@@ -1,4 +1,3 @@
-# handlers/referral.py
 import telebot
 import config
 from db import get_user, clear_pending_referral, add_referral
