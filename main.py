@@ -16,14 +16,22 @@ init_db()
 @bot.message_handler(commands=["start"])
 def start_command(message):
     user_id = str(message.from_user.id)
-    pending_ref = extract_referral_code(message)
     user = get_user(user_id)
+    # If user exists and is banned, notify and do not proceed
+    if user and user[5] == 1:
+        bot.send_message(message.chat.id, "You are banned and cannot use this bot.If You Think This Is A Mistake Contact @wantan1
+@onecore5 @U_NK_N_OW_N1 @MrLazyOp")
+        return
+    pending_ref = extract_referral_code(message)
     if not user:
-        add_user(user_id,
-                 message.from_user.username or message.from_user.first_name,
-                 datetime.now().strftime("%Y-%m-%d"),
-                 pending_referrer=pending_ref)
+        add_user(
+            user_id,
+            message.from_user.username or message.from_user.first_name,
+            datetime.now().strftime("%Y-%m-%d"),
+            pending_referrer=pending_ref
+        )
     send_verification_message(bot, message)
+
 
 @bot.message_handler(commands=["gen"])
 def gen_command(message):
