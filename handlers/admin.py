@@ -579,8 +579,7 @@ elif data.startswith("admin_user_") and data.count("_") == 3:
     user_id = parts[2]
     action = parts[3]
     handle_user_ban_action(bot, call, user_id, action)
-
-    elif data == "back_main":
+elif data == "back_main":
         from handlers.main_menu import send_main_menu
         send_main_menu(bot, call)
     else:
