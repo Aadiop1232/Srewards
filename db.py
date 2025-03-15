@@ -1,9 +1,10 @@
 import sqlite3
 import os
 from datetime import datetime
+import json
 import config
 
-# Place the database file in the project root (one level up from this file)
+# The database file is stored in the project root so that it travels with your code.
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bot.db")
 
 def get_connection():
@@ -12,7 +13,7 @@ def get_connection():
 def init_db():
     conn = get_connection()
     c = conn.cursor()
-    # Users table: telegram_id, username, join_date, points, referrals, banned, pending_referrer
+    # Users table
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             telegram_id TEXT PRIMARY KEY,
@@ -32,7 +33,7 @@ def init_db():
             PRIMARY KEY (user_id, referred_id)
         )
     ''')
-    # Platforms table: platform_name, stock stored as JSON text, and price
+    # Platforms table: stock stored as JSON text and price as an integer.
     c.execute('''
         CREATE TABLE IF NOT EXISTS platforms (
             platform_name TEXT PRIMARY KEY,
@@ -180,7 +181,7 @@ def clear_pending_referral(telegram_id):
 def add_review(user_id, review_text):
     conn = get_connection()
     c = conn.cursor()
-    c.execute("INSERT INTO reviews (user_id, review) VALUES (?, ?, ?)", (user_id, review_text, datetime.now()))
+    c.execute("INSERT INTO reviews (user_id, review, timestamp) VALUES (?, ?, ?)", (user_id, review_text, datetime.now()))
     conn.commit()
     c.close()
     conn.close()
@@ -192,7 +193,7 @@ def add_review(user_id, review_text):
 def log_admin_action(admin_id, action):
     conn = get_connection()
     c = conn.cursor()
-    c.execute("INSERT INTO admin_logs (admin_id, action) VALUES (?, ?, ?)", (admin_id, action, datetime.now()))
+    c.execute("INSERT INTO admin_logs (admin_id, action, timestamp) VALUES (?, ?, ?)", (admin_id, action, datetime.now()))
     conn.commit()
     c.close()
     conn.close()
@@ -261,7 +262,6 @@ def get_keys():
 def set_config_value(key, value):
     conn = get_connection()
     c = conn.cursor()
-    # REPLACE INTO will insert or update the row.
     c.execute("REPLACE INTO configurations (config_key, config_value) VALUES (?, ?)", (key, str(value)))
     conn.commit()
     c.close()
@@ -316,6 +316,28 @@ def get_admin_dashboard():
     c.close()
     conn.close()
     return total_users, banned_users, total_points
+
+# -----------------------
+# New Functions for Platforms
+# -----------------------
+
+def get_platforms():
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM platforms")
+    platforms = c.fetchall()
+    c.close()
+    conn.close()
+    return [dict(p) for p in platforms]
+
+def update_stock_for_platform(platform_name, stock):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE platforms SET stock = ? WHERE platform_name = ?", (json.dumps(stock), platform_name))
+    conn.commit()
+    c.close()
+    conn.close()
 
 if __name__ == '__main__':
     init_db()
