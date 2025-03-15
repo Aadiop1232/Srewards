@@ -190,12 +190,17 @@ def get_all_users():
 # -----------------------
 
 def send_admin_menu(bot, update):
-    if hasattr(update, "message"):
+    # Determine chat_id and message_id based on whether update is a Message or CallbackQuery
+    if isinstance(update, telebot.types.Message):
+        chat_id = update.chat.id
+        message_id = update.message_id
+    elif isinstance(update, telebot.types.CallbackQuery):
         chat_id = update.message.chat.id
         message_id = update.message.message_id
     else:
-        chat_id = update.message.chat.id
-        message_id = update.message.message_id
+        chat_id = update.chat.id
+        message_id = update.message_id
+
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton("📺 Platform Mgmt", callback_data="admin_platform"),
@@ -210,6 +215,7 @@ def send_admin_menu(bot, update):
         bot.edit_message_text("🛠 Admin Panel", chat_id=chat_id, message_id=message_id, reply_markup=markup)
     except Exception:
         bot.send_message(chat_id, "🛠 Admin Panel", reply_markup=markup)
+
 
 def handle_admin_platform(bot, call):
     platforms = get_platforms()
