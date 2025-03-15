@@ -1,185 +1,200 @@
 # handlers/admin.py
 import telebot
 from telebot import types
-import random, string, json
-import config
+import random, string
 from datetime import datetime
-
-from db import (
-    get_user,
-    ban_user,
-    unban_user,
-    add_key,
-    claim_key_in_db,
-    update_user_points,
-    add_referral,
-    set_account_claim_cost,
-    get_account_claim_cost,
-    set_referral_bonus,
-    get_referral_bonus,
-    get_leaderboard,
-    get_admin_dashboard
-)
-from db import db  # global MongoDB object
-
-# Collections for platforms, channels, admins, and users
-platforms_collection = db.platforms
-channels_collection = db.channels
-admins_collection = db.admins
-users_collection = db.users
-
+import config
+from db import get_user, ban_user, unban_user, add_key, claim_key_in_db, update_user_points, set_account_claim_cost, get_account_claim_cost, set_referral_bonus, get_referral_bonus, get_leaderboard, get_admin_dashboard, init_db
 from handlers.logs import log_event
 
-# -----------------------
-# Platform Management Functions
-# -----------------------
-
+# Check if a user is admin or owner
 def is_admin(user_or_id):
-    """
-    Returns True if the given user (or user ID) is an admin or owner.
-    """
     try:
         user_id = str(user_or_id.id)
     except AttributeError:
         user_id = str(user_or_id)
     return user_id in config.OWNERS or user_id in config.ADMINS
 
-
+# PLATFORM MANAGEMENT FUNCTIONS
 def add_platform(platform_name):
-    if platforms_collection.find_one({"platform_name": platform_name}):
+    conn = __import__('db').get_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM platforms WHERE platform_name = ?", (platform_name,))
+    if c.fetchone():
+        c.close()
+        conn.close()
         return f"Platform '{platform_name}' already exists."
-    # Insert platform with an empty stock list and a price field (default from config)
-    platform = {
-        "platform_name": platform_name,
-        "stock": [],
-        "price": get_account_claim_cost()
-    }
-    platforms_collection.insert_one(platform)
-    # Log the event
+    c.execute("INSERT INTO platforms (platform_name, stock, price) VALUES (?, ?, ?)", (platform_name, "[]", get_account_claim_cost()))
+    conn.commit()
+    c.close()
+    conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "platform", f"Platform '{platform_name}' added.")
     return None
 
 def remove_platform(platform_name):
-    platforms_collection.delete_one({"platform_name": platform_name})
+    conn = __import__('db').get_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM platforms WHERE platform_name = ?", (platform_name,))
+    conn.commit()
+    c.close()
+    conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "platform", f"Platform '{platform_name}' removed.")
 
 def get_platforms():
-    return list(platforms_collection.find())
+    conn = __import__('db').get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM platforms")
+    platforms = c.fetchall()
+    c.close()
+    conn.close()
+    return [dict(p) for p in platforms]
 
 def add_stock_to_platform(platform_name, accounts):
-    platform = platforms_collection.find_one({"platform_name": platform_name})
-    if not platform:
-        return f"Platform '{platform_name}' not found."
-    current_stock = platform.get("stock", [])
+    import json
+    conn = __import__('db').get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT stock FROM platforms WHERE platform_name = ?", (platform_name,))
+    row = c.fetchone()
+    current_stock = json.loads(row["stock"]) if row and row["stock"] else []
     new_stock = current_stock + accounts
-    platforms_collection.update_one(
-        {"platform_name": platform_name},
-        {"$set": {"stock": new_stock}}
-    )
+    c.execute("UPDATE platforms SET stock = ? WHERE platform_name = ?", (json.dumps(new_stock), platform_name))
+    conn.commit()
+    c.close()
+    conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "stock", f"Added {len(accounts)} accounts to platform '{platform_name}'.")
     return f"Stock updated with {len(accounts)} accounts."
 
 def update_stock_for_platform(platform_name, stock):
-    platforms_collection.update_one(
-        {"platform_name": platform_name},
-        {"$set": {"stock": stock}}
-    )
+    import json
+    conn = __import__('db').get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE platforms SET stock = ? WHERE platform_name = ?", (json.dumps(stock), platform_name))
+    conn.commit()
+    c.close()
+    conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "stock", f"Platform '{platform_name}' stock updated to {len(stock)} accounts.")
 
-# -----------------------
-# Channel Management Functions
-# -----------------------
-
+# CHANNEL MANAGEMENT FUNCTIONS
 def add_channel(channel_link):
-    channels_collection.insert_one({"channel_link": channel_link})
+    conn = __import__('db').get_connection()
+    c = conn.cursor()
+    c.execute("INSERT INTO channels (channel_link) VALUES (?)", (channel_link,))
+    conn.commit()
+    c.close()
+    conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "channel", f"Channel '{channel_link}' added.")
 
 def remove_channel(channel_id):
-    channels_collection.delete_one({"_id": channel_id})
+    conn = __import__('db').get_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM channels WHERE id = ?", (channel_id,))
+    conn.commit()
+    c.close()
+    conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "channel", f"Channel with ID '{channel_id}' removed.")
 
 def get_channels():
-    return list(channels_collection.find())
+    conn = __import__('db').get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM channels")
+    channels = c.fetchall()
+    c.close()
+    conn.close()
+    return [dict(ch) for ch in channels]
 
-# -----------------------
-# Admin Management Functions
-# -----------------------
-
+# ADMINS MANAGEMENT FUNCTIONS
 def get_admins():
-    return list(admins_collection.find())
+    conn = __import__('db').get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM admins")
+    admins = c.fetchall()
+    c.close()
+    conn.close()
+    return [dict(a) for a in admins]
 
 def add_admin(user_id, username, role="admin"):
-    admins_collection.update_one(
-        {"user_id": user_id},
-        {"$set": {"username": username, "role": role, "banned": False}},
-        upsert=True
-    )
+    conn = __import__('db').get_connection()
+    c = conn.cursor()
+    c.execute("REPLACE INTO admins (user_id, username, role, banned) VALUES (?, ?, ?, 0)", (user_id, username, role))
+    conn.commit()
+    c.close()
+    conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "admin", f"Admin '{user_id}' ({username}) added with role '{role}'.")
 
 def remove_admin(user_id):
-    admins_collection.delete_one({"user_id": user_id})
+    conn = __import__('db').get_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM admins WHERE user_id = ?", (user_id,))
+    conn.commit()
+    c.close()
+    conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "admin", f"Admin '{user_id}' removed.")
 
 def ban_admin(user_id):
-    admins_collection.update_one(
-        {"user_id": user_id},
-        {"$set": {"banned": True}}
-    )
+    conn = __import__('db').get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE admins SET banned = 1 WHERE user_id = ?", (user_id,))
+    conn.commit()
+    c.close()
+    conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "admin", f"Admin '{user_id}' banned.")
 
 def unban_admin(user_id):
-    admins_collection.update_one(
-        {"user_id": user_id},
-        {"$set": {"banned": False}}
-    )
+    conn = __import__('db').get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE admins SET banned = 0 WHERE user_id = ?", (user_id,))
+    conn.commit()
+    c.close()
+    conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "admin", f"Admin '{user_id}' unbanned.")
 
-# -----------------------
-# User Management Functions (For Admin Panel)
-# -----------------------
-
-def get_all_users():
-    return list(users_collection.find())
-
-# -----------------------
-# Lending Points Function (Admin Command)
-# -----------------------
-
+# LENDING POINTS
 def lend_points(admin_id, user_id, points):
-    user = get_user(user_id)
+    user = __import__('db').get_user(user_id)
     if not user:
         return f"User '{user_id}' not found."
     new_balance = user["points"] + points
     update_user_points(user_id, new_balance)
-    log_event(telebot.TeleBot(config.TOKEN), "lend", f"Admin {admin_id} added {points} points to user {user_id}.")
+    log_event(telebot.TeleBot(config.TOKEN), "lend", f"Admin {admin_id} lent {points} points to user {user_id}.")
     return f"{points} points have been added to user {user_id}. New balance: {new_balance} points."
 
-# -----------------------
-# Dynamic Configuration Commands (For Account Price and Referral Bonus)
-# -----------------------
-
-# (These helper functions are in db.py; commands are handled in main.py, but here we wrap them if needed)
+# DYNAMIC CONFIGURATION COMMANDS
 def update_account_claim_cost(cost):
-    set_account_claim_cost(cost)
+    from db import set_config_value
+    set_config_value("account_claim_cost", cost)
     log_event(telebot.TeleBot(config.TOKEN), "config", f"Account claim cost updated to {cost} points.")
 
 def update_referral_bonus(bonus):
-    set_referral_bonus(bonus)
+    from db import set_config_value
+    set_config_value("referral_bonus", bonus)
     log_event(telebot.TeleBot(config.TOKEN), "config", f"Referral bonus updated to {bonus} points.")
 
+# USER MANAGEMENT (for Admin Panel)
+def get_all_users():
+    from db import get_connection
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM users")
+    users = c.fetchall()
+    c.close()
+    conn.close()
+    return [dict(u) for u in users]
+
 # -----------------------
-# Admin Panel Callback Handlers & Sub-Handlers
+# Admin Panel Callback Router and Handlers
 # -----------------------
 
 def send_admin_menu(bot, update):
     if hasattr(update, "message"):
         chat_id = update.message.chat.id
         message_id = update.message.message_id
-    elif hasattr(update, "data"):
-        chat_id = update.message.chat.id
-        message_id = update.message.message_id
     else:
-        chat_id = update.chat.id
+        chat_id = update.message.chat.id
         message_id = update.message.message_id
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
@@ -253,21 +268,21 @@ def handle_admin_stock(bot, call):
                           message_id=call.message.message_id, reply_markup=markup)
 
 def handle_admin_stock_platform(bot, call, platform_name):
-    msg = bot.send_message(call.message.chat.id, f"✏️ Send the stock text for platform {platform_name} (attach a file or type text):")
+    msg = bot.send_message(call.message.chat.id, f"✏️ Send the stock text for platform {platform_name} (attach file or type text):")
     bot.register_next_step_handler(msg, process_stock_upload_admin, platform_name)
 
 def process_stock_upload_admin(message, platform_name):
-    bot_instance = telebot.TeleBot(config.TOKEN)
+    # Support multiple stock formats: if blank lines exist, split by double newline; else by newline.
     if message.content_type == "document":
         try:
-            file_info = bot_instance.get_file(message.document.file_id)
-            downloaded_file = bot_instance.download_file(file_info.file_path)
+            file_info = bot.get_file(message.document.file_id)
+            downloaded_file = bot.download_file(file_info.file_path)
             try:
                 data = downloaded_file.decode('utf-8')
             except UnicodeDecodeError:
                 data = downloaded_file.decode('latin-1', errors='replace')
         except Exception as e:
-            bot_instance.send_message(message.chat.id, f"❌ Error downloading file: {e}")
+            bot.send_message(message.chat.id, f"❌ Error downloading file: {e}")
             return
     else:
         data = message.text.strip()
@@ -276,9 +291,8 @@ def process_stock_upload_admin(message, platform_name):
     else:
         accounts = [line.strip() for line in data.splitlines() if line.strip()]
     update_stock_for_platform(platform_name, accounts)
-    bot_instance.send_message(message.chat.id,
-                              f"✅ Stock for {platform_name} updated with {len(accounts)} accounts.")
-    send_admin_menu(bot_instance, message)
+    bot.send_message(message.chat.id, f"✅ Stock for {platform_name} updated with {len(accounts)} accounts.")
+    send_admin_menu(bot, message)
 
 def handle_admin_channel(bot, call):
     markup = types.InlineKeyboardMarkup(row_width=2)
@@ -308,7 +322,7 @@ def handle_admin_channel_remove(bot, call):
         return
     markup = types.InlineKeyboardMarkup(row_width=1)
     for channel in channels:
-        cid = str(channel.get("_id"))
+        cid = str(channel.get("id"))
         link = channel.get("channel_link")
         markup.add(types.InlineKeyboardButton(link, callback_data=f"admin_channel_rm_{cid}"))
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_channel"))
@@ -351,17 +365,24 @@ def handle_admin_ban_unban(bot, call):
 
 def process_admin_ban_unban(message):
     user_id = message.text.strip()
-    bot_instance = telebot.TeleBot(config.TOKEN)
-    admin_doc = admins_collection.find_one({"user_id": user_id})
+    from db import get_connection
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM admins WHERE user_id = ?", (user_id,))
+    admin_doc = c.fetchone()
     if not admin_doc:
         response = "Admin not found."
     else:
-        if admin_doc.get("banned", False):
+        if admin_doc["banned"]:
             unban_admin(user_id)
             response = f"Admin {user_id} has been unbanned."
         else:
             ban_admin(user_id)
             response = f"Admin {user_id} has been banned."
+    c.close()
+    conn.close()
+    bot_instance = telebot.TeleBot(config.TOKEN)
     bot_instance.send_message(message.chat.id, response)
     send_admin_menu(bot_instance, message)
 
@@ -371,9 +392,9 @@ def handle_admin_remove(bot, call):
 
 def process_admin_remove(message):
     user_id = message.text.strip()
-    bot_instance = telebot.TeleBot(config.TOKEN)
     remove_admin(user_id)
     response = f"Admin {user_id} removed."
+    bot_instance = telebot.TeleBot(config.TOKEN)
     bot_instance.send_message(message.chat.id, response)
     send_admin_menu(bot_instance, message)
 
@@ -393,12 +414,9 @@ def process_admin_add(message):
     bot_instance.send_message(message.chat.id, response)
     send_admin_menu(bot_instance, message)
 
-# -----------------------
-# User Management (Admin Panel)
-# -----------------------
-
+# USER MANAGEMENT (Admin Panel)
 def handle_user_management(bot, call):
-    users = list(users_collection.find())
+    users = get_all_users()
     if not users:
         bot.answer_callback_query(call.id, "No users found.")
         return
@@ -406,7 +424,7 @@ def handle_user_management(bot, call):
     for u in users:
         uid = u.get("telegram_id")
         username = u.get("username")
-        banned = u.get("banned", False)
+        banned = u.get("banned", 0)
         status = "Banned" if banned else "Active"
         btn_text = f"{username} ({uid}) - {status}"
         callback_data = f"admin_user_{uid}"
@@ -420,7 +438,7 @@ def handle_user_management_detail(bot, call, user_id):
     if not user:
         bot.answer_callback_query(call.id, "User not found.")
         return
-    status = "Banned" if user.get("banned", False) else "Active"
+    status = "Banned" if user.get("banned", 0) else "Active"
     text = (f"User Management\n\n"
             f"User ID: {user.get('telegram_id')}\n"
             f"Username: {user.get('username')}\n"
@@ -429,7 +447,7 @@ def handle_user_management_detail(bot, call, user_id):
             f"Total Referrals: {user.get('referrals')}\n"
             f"Status: {status}")
     markup = types.InlineKeyboardMarkup(row_width=2)
-    if user.get("banned", False):
+    if user.get("banned", 0):
         markup.add(types.InlineKeyboardButton("Unban", callback_data=f"admin_user_{user_id}_unban"))
     else:
         markup.add(types.InlineKeyboardButton("Ban", callback_data=f"admin_user_{user_id}_ban"))
@@ -453,70 +471,14 @@ def handle_user_ban_action(bot, call, user_id, action):
     bot.answer_callback_query(call.id, result_text)
     handle_user_management_detail(bot, call, user_id)
 
-# -----------------------
-# Lending Points Command (Admin)
-# -----------------------
-
-def handle_lend_command(bot, message):
-    parts = message.text.strip().split()
-    if len(parts) < 3:
-        bot.reply_to(message, "Usage: /lend <user_id> <points>")
-        return
-    user_id = parts[1]
-    try:
-        points = int(parts[2])
-    except ValueError:
-        bot.reply_to(message, "Points must be a number.")
-        return
-    result = lend_points(message.from_user.id, user_id, points)
-    bot.reply_to(message, result)
-
-# -----------------------
-# Dynamic Configuration Commands (For Account Price and Referral Bonus)
-# Only owners can use these
-# -----------------------
-
-def handle_uprice_command(bot, message):
-    parts = message.text.strip().split()
-    if len(parts) < 2:
-        bot.reply_to(message, "Usage: /Uprice <points>")
-        return
-    try:
-        price = int(parts[1])
-    except ValueError:
-        bot.reply_to(message, "Points must be a number.")
-        return
-    if str(message.from_user.id) not in config.OWNERS:
-        bot.reply_to(message, "Access denied.")
-        return
-    update_account_claim_cost(price)
-    bot.reply_to(message, f"Account claim cost updated to {price} points.")
-    
-def handle_rpoints_command(bot, message):
-    parts = message.text.strip().split()
-    if len(parts) < 2:
-        bot.reply_to(message, "Usage: /Rpoints <points>")
-        return
-    try:
-        bonus = int(parts[1])
-    except ValueError:
-        bot.reply_to(message, "Points must be a number.")
-        return
-    if str(message.from_user.id) not in config.OWNERS:
-        bot.reply_to(message, "Access denied.")
-        return
-    update_referral_bonus(bonus)
-    bot.reply_to(message, f"Referral bonus updated to {bonus} points.")
-
-# -----------------------
-# Admin Callback Router
-# -----------------------
-
+# ADMIN CALLBACK ROUTER
 def admin_callback_handler(bot, call):
     data = call.data
+    # Check if the user is an admin or owner
     if not (str(call.from_user.id) in config.ADMINS or str(call.from_user.id) in config.OWNERS):
         bot.answer_callback_query(call.id, "Access prohibited.")
         return
+
     if data == "admin_platform":
         handle_admin_platform(bot, call)
     elif data == "admin_platform_add":
@@ -553,17 +515,17 @@ def admin_callback_handler(bot, call):
     elif data == "admin_users":
         handle_user_management(bot, call)
     elif data.startswith("admin_user_") and data.count("_") == 2:
-        # Format: admin_user_{user_id}
+        # Format: "admin_user_{user_id}"
         user_id = data.split("_")[2]
         handle_user_management_detail(bot, call, user_id)
     elif data.startswith("admin_user_") and data.count("_") == 3:
-        # Format: admin_user_{user_id}_ban or admin_user_{user_id}_unban
+        # Format: "admin_user_{user_id}_ban" or "admin_user_{user_id}_unban"
         parts = data.split("_")
         user_id = parts[2]
         action = parts[3]
         handle_user_ban_action(bot, call, user_id, action)
     elif data == "back_main":
         from handlers.main_menu import send_main_menu
-        send_main_menu(bot, call)
+        send_main_menu(bot, call.message)
     else:
         bot.answer_callback_query(call.id, "Unknown admin command.")
