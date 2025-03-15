@@ -20,7 +20,7 @@ ADMINS = ["6061298481", "1572380763"]
 LOGS_CHANNEL = "@ShadowBotLogs"
 
 # MongoDB connection settings
-MONGO_URI = "mongodb+srv://khanaadi2030:gPUg8FifKWRihCpM@cluster0.oy1in.mongodb.net/shadow_rewards_db?retryWrites=true&w=majority"
+MONGO_URI = "mongodb+srv://khanaadi2030:sRBArJUApUR53jSM@cluster0.oy1in.mongodb.net/shadow_rewards_db?retryWrites=true&w=majority"
 MONGO_DB_NAME = "shadow_rewards_db"
 
 # Default dynamic configuration values
