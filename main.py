@@ -19,8 +19,7 @@ def start_command(message):
     user = get_user(user_id)
     # If user exists and is banned, notify and do not proceed
     if user and user[5] == 1:
-        bot.send_message(message.chat.id, "You are banned and cannot use this bot.If You Think This Is A Mistake Contact @wantan1
-@onecore5 @U_NK_N_OW_N1 @MrLazyOp")
+        bot.send_message(message.chat.id, "You are banned and cannot use this bot.If You Think This Is A Mistake Contact @wantan1 @onecore5 @U_NK_N_OW_N1 @MrLazyOp")
         return
     pending_ref = extract_referral_code(message)
     if not user:
