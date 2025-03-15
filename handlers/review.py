@@ -5,19 +5,13 @@ import config
 from handlers.logs import log_event
 
 def prompt_review(bot, message):
-    """
-    Prompts the user to send a review or suggestion.
-    """
     msg = bot.send_message(message.chat.id, "💬 Please send your review or suggestion:")
     bot.register_next_step_handler(msg, process_review)
 
 def process_review(message):
     review_text = message.text
-    # Save the review in the database
     add_review(str(message.from_user.id), review_text)
     bot = telebot.TeleBot(config.TOKEN)
-    
-    # Notify all owners about the new review
     for owner in config.OWNERS:
         try:
             bot.send_message(owner,
@@ -25,6 +19,5 @@ def process_review(message):
                              parse_mode="Markdown")
         except Exception as e:
             print(f"Error sending review to owner {owner}: {e}")
-    
     bot.send_message(message.chat.id, "✅ Thank you for your feedback!", parse_mode="Markdown")
     log_event(bot, "review", f"Review received from user {message.from_user.id}.")
