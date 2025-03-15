@@ -1,13 +1,18 @@
+# handlers/account_info.py
 from db import get_user, add_user
 from datetime import datetime
 
 def send_account_info(bot, update):
-    if hasattr(update, "data"):
-        user_obj = update.from_user
+    # Determine chat_id and user object for both message and callback query updates
+    if hasattr(update, "message"):
         chat_id = update.message.chat.id
-    else:
         user_obj = update.from_user
+    elif hasattr(update, "data"):
+        chat_id = update.message.chat.id
+        user_obj = update.from_user
+    else:
         chat_id = update.chat.id
+        user_obj = update.from_user
 
     telegram_id = str(user_obj.id)
     user = get_user(telegram_id)
@@ -18,13 +23,13 @@ def send_account_info(bot, update):
             datetime.now().strftime("%Y-%m-%d")
         )
         user = get_user(telegram_id)
+
     text = (
-        f"<b>👤 Account Info 😁</b>\n"
-        f"• <b>Username:</b> {user[1]}\n"
-        f"• <b>User ID:</b> {user[0]}\n"
-        f"• <b>Join Date:</b> {user[2]}\n"
-        f"• <b>Balance:</b> {user[3]} points\n"
-        f"• <b>Total Referrals:</b> {user[4]}"
+        "<b>👤 Account Info</b>\n"
+        f"• <b>Username:</b> {user.get('username')}\n"
+        f"• <b>User ID:</b> {user.get('telegram_id')}\n"
+        f"• <b>Join Date:</b> {user.get('join_date')}\n"
+        f"• <b>Balance:</b> {user.get('points')} points\n"
+        f"• <b>Total Referrals:</b> {user.get('referrals')}\n"
     )
     bot.send_message(chat_id, text, parse_mode="HTML")
-    
