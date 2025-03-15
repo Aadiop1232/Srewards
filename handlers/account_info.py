@@ -3,7 +3,6 @@ from db import get_user, add_user
 from datetime import datetime
 
 def send_account_info(bot, update):
-    # Determine chat_id and user object for both message and callback query updates
     if hasattr(update, "message"):
         chat_id = update.message.chat.id
         user_obj = update.from_user
@@ -23,7 +22,7 @@ def send_account_info(bot, update):
             datetime.now().strftime("%Y-%m-%d")
         )
         user = get_user(telegram_id)
-
+    
     text = (
         "<b>👤 Account Info</b>\n"
         f"• <b>Username:</b> {user.get('username')}\n"
