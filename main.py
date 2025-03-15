@@ -12,7 +12,6 @@ from handlers.admin import send_admin_menu, admin_callback_handler, lend_points,
 from handlers.logs import log_event
 
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
-init_db()  # For Mongo, this ensures connection setup if needed
 
 # --- Command Handlers ---
 
