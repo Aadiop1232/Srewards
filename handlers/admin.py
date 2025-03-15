@@ -514,16 +514,29 @@ def handle_user_management_detail(bot, call, user_id):
 
 
 def handle_user_ban_action(bot, call, user_id, action):
+    # Debug output to verify the callback data is received
+    print(f"[DEBUG] handle_user_ban_action called with user_id={user_id}, action={action}")
+    
     if action == "ban":
         ban_user(user_id)
-        text = f"🙌🏼 User {user_id} has been banned."
+        result_text = f"User {user_id} has been banned."
     elif action == "unban":
         unban_user(user_id)
-        text = f"🙂‍↔️ User {user_id} has been unbanned."
+        result_text = f"User {user_id} has been unbanned."
     else:
-        text = "Invalid action."
-    bot.answer_callback_query(call.id, text)
-    handle_user_management_detail(bot, call, user_id)
+        result_text = "Invalid action."
+    
+    try:
+        bot.answer_callback_query(call.id, result_text)
+    except Exception as e:
+        print(f"[ERROR] Error answering callback: {e}")
+    
+    try:
+        # Refresh the user detail view to show updated status
+        handle_user_management_detail(bot, call, user_id)
+    except Exception as e:
+        print(f"[ERROR] Error updating user management detail: {e}")
+
 
 
 def admin_callback_handler(bot, call):
