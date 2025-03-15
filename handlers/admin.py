@@ -1,11 +1,15 @@
-# handlers/admin.py
-import telebot
-from telebot import types
-import random, string
-from datetime import datetime
+import sqlite3  # Added import for sqlite3
 import config
-from db import get_user, ban_user, unban_user, add_key, claim_key_in_db, update_user_points, set_account_claim_cost, get_account_claim_cost, set_referral_bonus, get_referral_bonus, get_leaderboard, get_admin_dashboard, init_db
+from telebot import types
+from db import get_user, ban_user, unban_user, get_all_users  # Ensure get_all_users is defined in db.py or here
 from handlers.logs import log_event
+from handlers.admin import (
+    handle_admin_platform, handle_admin_platform_add, handle_admin_platform_remove, 
+    handle_admin_platform_rm, handle_admin_stock, handle_admin_stock_platform,
+    handle_admin_channel, handle_admin_channel_add, handle_admin_channel_remove, handle_admin_channel_rm,
+    handle_admin_manage, handle_admin_list, handle_admin_ban_unban, handle_admin_remove, handle_admin_add,
+    handle_user_management, handle_user_management_detail, handle_user_ban_action
+)
 
 # Check if a user is admin or owner
 def is_admin(user_or_id):
