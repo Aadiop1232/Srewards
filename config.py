@@ -1,7 +1,7 @@
 # config.py
 
 # Bot settings
-TOKEN = "YOUR_BOT_TOKEN_HERE"
+TOKEN = "7760154469:AAFwBrol9EP2L78Wt0sTqXcoz3OiL4HPy8I"
 BOT_USERNAME = "ShadowRewardsBot"  # without the '@' symbol
 
 # Required channels users must join
