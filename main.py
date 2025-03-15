@@ -45,7 +45,7 @@ def gen_command(message):
     try:
         qty = int(parts[2])
     except ValueError:
-        bot.reply_to(message, "😒 Quantity must be a number.")
+        bot.reply_to(message, "Quantity must be a number.")
         return
     generated = []
     if key_type == "normal":
@@ -61,7 +61,17 @@ def gen_command(message):
     else:
         bot.reply_to(message, "Key type must be either 'normal' or 'premium'.")
         return
-    bot.reply_to(message, "Generated keys:\n" + "\n".join(generated))
+    
+    if generated:
+        text = f"Redeem Generated ✅➔ `{generated[0]}`\n"
+        for key in generated[1:]:
+            text += f"➔ `{key}`\n"
+        text += "\nYou can redeem this code using this command: /redeem <Key>"
+    else:
+        text = "No keys generated."
+    
+    bot.reply_to(message, text, parse_mode="Markdown")
+
 
 @bot.message_handler(commands=["redeem"])
 def redeem_command(message):
