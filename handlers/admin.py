@@ -569,7 +569,7 @@ def admin_callback_handler(bot, call):
     elif data.startswith("user_") and data.count("_") == 1:
         user_id = data.split("_")[1]
         handle_user_management_detail(bot, call, user_id)
-  elif data.startswith("admin_user_") and data.count("_") == 2:
+    elif data.startswith("admin_user_") and data.count("_") == 2:
     # data format: "admin_user_{user_id}"
     user_id = data.split("_")[2]
     handle_user_management_detail(bot, call, user_id)
