@@ -460,11 +460,12 @@ def handle_user_management(bot, call):
         return
     markup = types.InlineKeyboardMarkup(row_width=1)
     for u in users:
-        user_id, username, banned = u
-        status = "Banned" if banned else "Active"
-        btn_text = f"{username} ({user_id}) - {status}"
-        callback_data = f"user_{user_id}"
-        markup.add(types.InlineKeyboardButton(btn_text, callback_data=callback_data))
+    user_id, username, banned = u
+    status = "Banned" if banned else "Active"
+    btn_text = f"{username} ({user_id}) - {status}"
+    callback_data = f"admin_user_{user_id}"  # Updated prefix to trigger admin callback handler
+    markup.add(types.InlineKeyboardButton(btn_text, callback_data=callback_data))
+
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
     bot.edit_message_text("User Management\nSelect a user to manage:", chat_id=call.message.chat.id,
                             message_id=call.message.message_id, reply_markup=markup)
