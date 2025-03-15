@@ -16,14 +16,6 @@ def extract_referral_code(message):
     return None
 
 def process_verified_referral(telegram_id, bot_instance):
-    """
-    After a user is verified, this function checks if they have a pending referral.
-    If so, it processes the referral:
-      - Adds a referral record.
-      - Awards the referrer bonus points.
-      - Clears the pending referral flag.
-      - Notifies the referrer and logs the event.
-    """
     user = get_user(str(telegram_id))
     if user and user.get("pending_referrer"):
         referrer_id = user.get("pending_referrer")
@@ -36,9 +28,6 @@ def process_verified_referral(telegram_id, bot_instance):
         log_event(bot_instance, "referral", f"User {referrer_id} referred user {user.get('telegram_id')}.")
 
 def send_referral_menu(bot, message):
-    """
-    Sends the referral menu to the user. This includes a button to get their referral link.
-    """
     telegram_id = str(message.from_user.id)
     text = "🔗 Referral System\nYour referral link is below."
     markup = telebot.types.InlineKeyboardMarkup()
@@ -47,7 +36,4 @@ def send_referral_menu(bot, message):
     bot.send_message(message.chat.id, text, reply_markup=markup, parse_mode="HTML")
 
 def get_referral_link(telegram_id):
-    """
-    Returns the referral link for the user.
-    """
     return f"https://t.me/{config.BOT_USERNAME}?start=ref_{telegram_id}"
