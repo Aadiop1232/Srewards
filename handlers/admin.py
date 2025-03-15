@@ -273,34 +273,29 @@ def handle_admin_stock_platform(bot, call, platform):
 def process_stock_upload(message, platform):
     bot_instance = telebot.TeleBot(config.TOKEN)
     if message.content_type == "document":
-        file_info = bot_instance.get_file(message.document.file_id)
-        downloaded_file = bot_instance.download_file(file_info.file_path)
         try:
-            data = downloaded_file.decode('utf-8')
+            file_info = bot_instance.get_file(message.document.file_id)
+            downloaded_file = bot_instance.download_file(file_info.file_path)
+            try:
+                data = downloaded_file.decode('utf-8')
+            except UnicodeDecodeError:
+                data = downloaded_file.decode('latin-1', errors='replace')
         except Exception as e:
-            bot_instance.send_message(message.chat.id, f"Error decoding file: {e}")
+            bot_instance.send_message(message.chat.id, f"❌ Error downloading file: {e}", parse_mode="Markdown")
             return
     else:
         data = message.text.strip()
-    import re
-    email_pattern = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+")
-    accounts = []
-    current_account = ""
-    for line in data.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        if email_pattern.match(line):
-            if current_account:
-                accounts.append(current_account.strip())
-            current_account = line
-        else:
-            current_account += " " + line
-    if current_account:
-        accounts.append(current_account.strip())
+    
+    # Split into accounts:
+    if "\n\n" in data:
+        accounts = [block.strip() for block in data.split("\n\n") if block.strip()]
+    else:
+        accounts = [line.strip() for line in data.splitlines() if line.strip()]
+    
     add_stock_to_platform(platform, accounts)
     bot_instance.send_message(message.chat.id,
-                              f"✅ Stock for {platform} updated with {len(accounts)} accounts.")
+                              f"✅ Stock for *{platform}* updated with {len(accounts)} accounts.",
+                              parse_mode="Markdown")
     from handlers.admin import send_admin_menu
     send_admin_menu(bot_instance, message)
 
