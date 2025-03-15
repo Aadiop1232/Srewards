@@ -100,21 +100,27 @@ def process_stock_upload(bot, message, platform):
         try:
             file_info = bot.get_file(message.document.file_id)
             downloaded_file = bot.download_file(file_info.file_path)
-            data = downloaded_file.decode('utf-8')
+            try:
+                data = downloaded_file.decode('utf-8')
+            except UnicodeDecodeError:
+                data = downloaded_file.decode('latin-1', errors='replace')
         except Exception as e:
-            bot.send_message(message.chat.id, f"❌ Error downloading file: {e}", parse_mode="HTML")
+            bot.send_message(message.chat.id, f"❌ Error downloading file: {e}")
             return
     else:
         data = message.text.strip()
-    pattern = r"((?:[\w\.-]+@[\w\.-]+\.\w+).*?)(?=(?:[\w\.-]+@[\w\.-]+\.\w+)|$)"
-    accounts = re.findall(pattern, data, flags=re.DOTALL)
-    accounts = [acct.strip() for acct in accounts if acct.strip()]
-    if not accounts:
-        accounts = [data]
+    
+    # Support any stock entry:
+    # If there are blank lines, assume each block is one account; otherwise, each line is one account.
+    if "\n\n" in data:
+        accounts = [block.strip() for block in data.split("\n\n") if block.strip()]
+    else:
+        accounts = [line.strip() for line in data.splitlines() if line.strip()]
+    
     update_stock_for_platform(platform, accounts)
     bot.send_message(message.chat.id,
-                     f"✅ Stock for <b>{platform}</b> updated with {len(accounts)} accounts.",
-                     parse_mode="HTML")
+                     f"✅ Stock for {platform} updated with {len(accounts)} accounts.")
     from handlers.admin import send_admin_menu
     send_admin_menu(bot, message)
+
         
