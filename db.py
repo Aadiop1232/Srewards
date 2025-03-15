@@ -1,20 +1,17 @@
 """
 db.py - MongoDB-based database module for Shadow Rewards Bot
 
-Ensure your config.py includes:
-  MONGO_URI = "mongodb://localhost:27017/"   # or your remote MongoDB URI
-  MONGO_DB_NAME = "shadow_rewards_db"
-  
-This module provides functions to:
-  • Manage users (create, fetch, update points, ban/unban)
-  • Handle referrals, reviews, and key claims
-  • Store dynamic configuration values (e.g., account claim cost, referral bonus)
-  • Log admin actions
+This module uses PyMongo to connect to a MongoDB instance.
+Make sure your config.py includes:
+    MONGO_URI and MONGO_DB_NAME, along with other settings.
 """
 
-from pymongo import MongoClient, ReturnDocument
-from datetime import datetime
 import config
+from pymongo import MongoClient
+from datetime import datetime
+
+# For debugging: print the connection URI (ensure it’s the Atlas URI)
+print("MONGO_URI:", config.MONGO_URI)
 
 # Establish MongoDB connection
 client = MongoClient(config.MONGO_URI)
@@ -31,13 +28,20 @@ admins_collection = db.admins
 keys_collection = db.keys
 configurations_collection = db.configurations
 
+def init_db():
+    """
+    Dummy init_db function.
+    MongoDB connection is established when this module is imported.
+    """
+    pass
+
 # -----------------------
 # User Functions
 # -----------------------
 
 def add_user(telegram_id, username, join_date, pending_referrer=None):
     """
-    Adds a new user document if one doesn't exist.
+    Add a new user document if one doesn't exist.
     Default points: 20, referrals: 0, banned: False.
     """
     user = get_user(telegram_id)
@@ -56,7 +60,7 @@ def add_user(telegram_id, username, join_date, pending_referrer=None):
     return get_user(telegram_id)
 
 def get_user(telegram_id):
-    """Fetches a user document by telegram_id."""
+    """Fetch a user document by telegram_id."""
     return users_collection.find_one({"telegram_id": telegram_id})
 
 def update_user_pending_referral(telegram_id, pending_referrer):
@@ -96,7 +100,7 @@ def unban_user(telegram_id):
 def add_referral(referrer_id, referred_id):
     """
     Inserts a referral document if one doesn't already exist.
-    Also increments the referrer's points and referral count.
+    Increments the referrer's points and referral count.
     """
     existing = referrals_collection.find_one({"referred_id": referred_id})
     if existing:
@@ -106,7 +110,6 @@ def add_referral(referrer_id, referred_id):
         "referred_id": referred_id,
         "timestamp": datetime.now()
     })
-    # Get referral bonus from configuration (default 4)
     bonus = get_referral_bonus()
     users_collection.update_one(
         {"telegram_id": referrer_id},
@@ -149,12 +152,10 @@ def claim_key_in_db(key_str, telegram_id):
     if key_doc.get("claimed", False):
         return "Key already claimed."
     points_awarded = key_doc.get("points", 0)
-    # Mark the key as claimed
     keys_collection.update_one(
         {"key": key_str},
         {"$set": {"claimed": True, "claimed_by": telegram_id, "claimed_at": datetime.now()}}
     )
-    # Increment user's points
     users_collection.update_one(
         {"telegram_id": telegram_id},
         {"$inc": {"points": points_awarded}}
@@ -196,23 +197,20 @@ def set_account_claim_cost(cost):
 
 def get_account_claim_cost():
     cost = get_config_value("account_claim_cost")
-    return cost if cost is not None else 2  # Default cost is 2 points
+    return cost if cost is not None else config.DEFAULT_ACCOUNT_CLAIM_COST
 
 def set_referral_bonus(bonus):
     set_config_value("referral_bonus", bonus)
 
 def get_referral_bonus():
     bonus = get_config_value("referral_bonus")
-    return bonus if bonus is not None else 4  # Default bonus is 4 points
+    return bonus if bonus is not None else config.DEFAULT_REFERRAL_BONUS
 
 # -----------------------
 # Additional Functions
 # -----------------------
 
 def get_leaderboard(limit=10):
-    """
-    Returns top users sorted by points.
-    """
     cursor = users_collection.find({}, {"telegram_id": 1, "username": 1, "points": 1}).sort("points", -1).limit(limit)
     return list(cursor)
 
@@ -224,11 +222,6 @@ def get_admin_dashboard():
     total_points = result[0]["total_points"] if result else 0
     return total_users, banned_users, total_points
 
-# -----------------------
-# Main Block for Testing
-# -----------------------
-
 if __name__ == '__main__':
-    # For testing: print a sample user (if exists)
     test_user = get_user("123456")
     print("Test user:", test_user)
