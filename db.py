@@ -4,7 +4,7 @@ from datetime import datetime
 import json
 import config
 
-# The database file is stored in the project root so that it travels with your code.
+# Store the database file (bot.db) in the project root so that it moves with your code.
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bot.db")
 
 def get_connection():
@@ -13,7 +13,7 @@ def get_connection():
 def init_db():
     conn = get_connection()
     c = conn.cursor()
-    # Users table
+    # Users table: telegram_id, username, join_date, points, referrals, banned, pending_referrer
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             telegram_id TEXT PRIMARY KEY,
@@ -33,14 +33,15 @@ def init_db():
             PRIMARY KEY (user_id, referred_id)
         )
     ''')
-    # Platforms table: stock stored as JSON text and price as an integer.
-    c.execute('''
+    # Platforms table: stock stored as JSON text and price with a default value.
+    # Use f-string substitution here since SQLite doesn't support parameter substitution in DDL.
+    c.execute(f'''
         CREATE TABLE IF NOT EXISTS platforms (
             platform_name TEXT PRIMARY KEY,
             stock TEXT,
-            price INTEGER DEFAULT ?
+            price INTEGER DEFAULT {config.DEFAULT_ACCOUNT_CLAIM_COST}
         )
-    ''', (config.DEFAULT_ACCOUNT_CLAIM_COST,))
+    ''')
     # Reviews table
     c.execute('''
         CREATE TABLE IF NOT EXISTS reviews (
