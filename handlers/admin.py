@@ -514,7 +514,7 @@ def handle_user_management_detail(bot, call, user_id):
 
 
 def handle_user_ban_action(bot, call, user_id, action):
-    # Debug output to verify the callback data is received
+    # Debug output
     print(f"[DEBUG] handle_user_ban_action called with user_id={user_id}, action={action}")
     
     if action == "ban":
@@ -526,18 +526,72 @@ def handle_user_ban_action(bot, call, user_id, action):
     else:
         result_text = "Invalid action."
     
+    # Always answer the callback query
     try:
         bot.answer_callback_query(call.id, result_text)
     except Exception as e:
         print(f"[ERROR] Error answering callback: {e}")
     
+    # Refresh the user detail view so the updated banned status shows
     try:
-        # Refresh the user detail view to show updated status
         handle_user_management_detail(bot, call, user_id)
     except Exception as e:
         print(f"[ERROR] Error updating user management detail: {e}")
 
+def handle_user_management_detail(bot, call, user_id):
+    user = get_user(user_id)
+    if not user:
+        bot.answer_callback_query(call.id, "User not found.")
+        return
+    # Order: [telegram_id, username, join_date, points, referrals, banned, pending_referrer]
+    status = "Banned" if user[5] else "Active"
+    text = (
+        f"User Management\n\n"
+        f"User ID: {user[0]}\n"
+        f"Username: {user[1]}\n"
+        f"Join Date: {user[2]}\n"
+        f"Balance: {user[3]} points\n"
+        f"Total Referrals: {user[4]}\n"
+        f"Status: {status}"
+    )
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    if user[5]:
+        markup.add(types.InlineKeyboardButton("Unban", callback_data=f"admin_user_{user_id}_unban"))
+    else:
+        markup.add(types.InlineKeyboardButton("Ban", callback_data=f"admin_user_{user_id}_ban"))
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_users"))
+    
+    try:
+        bot.edit_message_text(
+            text,
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=markup
+        )
+    except Exception as e:
+        print(f"[ERROR] edit_message_text failed: {e}")
+        bot.send_message(call.message.chat.id, text, reply_markup=markup)
 
+def handle_user_management(bot, call):
+    users = get_users()
+    if not users:
+        bot.answer_callback_query(call.id, "No users found.")
+        return
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    for u in users:
+        user_id, username, banned = u
+        status = "Banned" if banned else "Active"
+        btn_text = f"{username} ({user_id}) - {status}"
+        # Use updated callback data so that it is handled in the admin callback router
+        callback_data = f"admin_user_{user_id}"
+        markup.add(types.InlineKeyboardButton(btn_text, callback_data=callback_data))
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
+    bot.edit_message_text(
+        "User Management\nSelect a user to manage:",
+        chat_id=call.message.chat.id,
+        message_id=call.message.message_id,
+        reply_markup=markup
+    )
 
 def admin_callback_handler(bot, call):
     data = call.data
