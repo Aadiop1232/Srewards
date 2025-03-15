@@ -484,7 +484,7 @@ def handle_user_ban_action(bot, call, user_id, action):
 # ADMIN CALLBACK ROUTER
 def admin_callback_handler(bot, call):
     data = call.data
-    # Check if the user is an admin or owner
+    # Check if the caller is admin or owner.
     if not (str(call.from_user.id) in config.ADMINS or str(call.from_user.id) in config.OWNERS):
         bot.answer_callback_query(call.id, "Access prohibited.")
         return
