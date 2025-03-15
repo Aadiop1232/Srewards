@@ -1,190 +1,234 @@
-import sqlite3
+"""
+db.py - MongoDB-based database module for Shadow Rewards Bot
 
-DATABASE = "bot.db"
-
-def init_db():
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
- 
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            telegram_id TEXT PRIMARY KEY,
-            username TEXT,
-            join_date TEXT,
-            points INTEGER DEFAULT 20,
-            referrals INTEGER DEFAULT 0,
-            banned INTEGER DEFAULT 0,
-            pending_referrer TEXT
-        )
-    ''')
-
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS referrals (
-            user_id TEXT,
-            referred_id TEXT,
-            PRIMARY KEY (user_id, referred_id)
-        )
-    ''')
-   
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS platforms (
-            platform_name TEXT PRIMARY KEY,
-            stock TEXT
-        )
-    ''')
- 
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS reviews (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT,
-            review TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
- 
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS admin_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            admin_id TEXT,
-            action TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+Ensure your config.py includes:
+  MONGO_URI = "mongodb://localhost:27017/"   # or your remote MongoDB URI
+  MONGO_DB_NAME = "shadow_rewards_db"
   
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS channels (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            channel_link TEXT
-        )
-    ''')
- 
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS admins (
-            user_id TEXT PRIMARY KEY,
-            username TEXT,
-            role TEXT,
-            banned INTEGER DEFAULT 0
-        )
-    ''')
-  
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS keys (
-            key TEXT PRIMARY KEY,
-            type TEXT,
-            points INTEGER,
-            claimed INTEGER DEFAULT 0,
-            claimed_by TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
-    conn.close()
+This module provides functions to:
+  • Manage users (create, fetch, update points, ban/unban)
+  • Handle referrals, reviews, and key claims
+  • Store dynamic configuration values (e.g., account claim cost, referral bonus)
+  • Log admin actions
+"""
+
+from pymongo import MongoClient, ReturnDocument
+from datetime import datetime
+import config
+
+# Establish MongoDB connection
+client = MongoClient(config.MONGO_URI)
+db = client[config.MONGO_DB_NAME]
+
+# Collections
+users_collection = db.users
+referrals_collection = db.referrals
+platforms_collection = db.platforms
+reviews_collection = db.reviews
+admin_logs_collection = db.admin_logs
+channels_collection = db.channels
+admins_collection = db.admins
+keys_collection = db.keys
+configurations_collection = db.configurations
+
+# -----------------------
+# User Functions
+# -----------------------
 
 def add_user(telegram_id, username, join_date, pending_referrer=None):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("INSERT OR IGNORE INTO users (telegram_id, username, join_date, pending_referrer) VALUES (?, ?, ?, ?)",
-              (telegram_id, username, join_date, pending_referrer))
-    conn.commit()
-    conn.close()
+    """
+    Adds a new user document if one doesn't exist.
+    Default points: 20, referrals: 0, banned: False.
+    """
+    user = get_user(telegram_id)
+    if user is None:
+        new_user = {
+            "telegram_id": telegram_id,
+            "username": username,
+            "join_date": join_date,
+            "points": 20,
+            "referrals": 0,
+            "banned": False,
+            "pending_referrer": pending_referrer,
+            "last_checkin": None
+        }
+        users_collection.insert_one(new_user)
+    return get_user(telegram_id)
 
 def get_user(telegram_id):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    
- 
-    c.execute("SELECT telegram_id, username, join_date, points, referrals, banned, pending_referrer FROM users WHERE telegram_id=?", (telegram_id,))
-    user = c.fetchone()
-    conn.close()
-    return user
+    """Fetches a user document by telegram_id."""
+    return users_collection.find_one({"telegram_id": telegram_id})
 
 def update_user_pending_referral(telegram_id, pending_referrer):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("UPDATE users SET pending_referrer=? WHERE telegram_id=?", (pending_referrer, telegram_id))
-    conn.commit()
-    conn.close()
+    users_collection.update_one(
+        {"telegram_id": telegram_id},
+        {"$set": {"pending_referrer": pending_referrer}}
+    )
 
 def clear_pending_referral(telegram_id):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("UPDATE users SET pending_referrer=NULL WHERE telegram_id=?", (telegram_id,))
-    conn.commit()
-    conn.close()
+    users_collection.update_one(
+        {"telegram_id": telegram_id},
+        {"$set": {"pending_referrer": None}}
+    )
 
-def add_referral(referrer_id, referred_id):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("SELECT * FROM referrals WHERE referred_id=?", (referred_id,))
-    if c.fetchone():
-        conn.close()
-        return
-    c.execute("INSERT INTO referrals (user_id, referred_id) VALUES (?, ?)", (referrer_id, referred_id))
-    c.execute("UPDATE users SET points = points + 4, referrals = referrals + 1 WHERE telegram_id=?", (referrer_id,))
-    conn.commit()
-    conn.close()
-
-def add_review(user_id, review):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("INSERT INTO reviews (user_id, review) VALUES (?, ?)", (user_id, review))
-    conn.commit()
-    conn.close()
-
-def log_admin_action(admin_id, action):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("INSERT INTO admin_logs (admin_id, action) VALUES (?, ?)", (admin_id, action))
-    conn.commit()
-    conn.close()
-
-def get_key(key):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("SELECT key, type, points, claimed FROM keys WHERE key=?", (key,))
-    result = c.fetchone()
-    conn.close()
-    return result
-
-def claim_key_in_db(key, telegram_id):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("SELECT claimed, type, points FROM keys WHERE key=?", (key,))
-    row = c.fetchone()
-    if not row:
-        conn.close()
-        return "Key not found."
-    if row[0] != 0:
-        conn.close()
-        return "Key already claimed."
-    points = row[2]
-    c.execute("UPDATE keys SET claimed=1, claimed_by=? WHERE key=?", (telegram_id, key))
-    c.execute("UPDATE users SET points = points + ? WHERE telegram_id=?", (points, telegram_id))
-    conn.commit()
-    conn.close()
-    return f"Key redeemed successfully. You've been awarded {points} points."
-
-def update_user_points(telegram_id, points):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("UPDATE users SET points=? WHERE telegram_id=?", (points, telegram_id))
-    conn.commit()
-    conn.close()
+def update_user_points(telegram_id, new_points):
+    users_collection.update_one(
+        {"telegram_id": telegram_id},
+        {"$set": {"points": new_points}}
+    )
 
 def ban_user(telegram_id):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("UPDATE users SET banned=1 WHERE telegram_id=?", (telegram_id,))
-    conn.commit()
-    conn.close()
+    users_collection.update_one(
+        {"telegram_id": telegram_id},
+        {"$set": {"banned": True}}
+    )
 
 def unban_user(telegram_id):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("UPDATE users SET banned=0 WHERE telegram_id=?", (telegram_id,))
-    conn.commit()
-    conn.close()
+    users_collection.update_one(
+        {"telegram_id": telegram_id},
+        {"$set": {"banned": False}}
+    )
+
+# -----------------------
+# Referral Functions
+# -----------------------
+
+def add_referral(referrer_id, referred_id):
+    """
+    Inserts a referral document if one doesn't already exist.
+    Also increments the referrer's points and referral count.
+    """
+    existing = referrals_collection.find_one({"referred_id": referred_id})
+    if existing:
+        return
+    referrals_collection.insert_one({
+        "referrer_id": referrer_id,
+        "referred_id": referred_id,
+        "timestamp": datetime.now()
+    })
+    # Get referral bonus from configuration (default 4)
+    bonus = get_referral_bonus()
+    users_collection.update_one(
+        {"telegram_id": referrer_id},
+        {"$inc": {"points": bonus, "referrals": 1}}
+    )
+
+# -----------------------
+# Review Functions
+# -----------------------
+
+def add_review(user_id, review_text):
+    reviews_collection.insert_one({
+        "user_id": user_id,
+        "review": review_text,
+        "timestamp": datetime.now()
+    })
+
+# -----------------------
+# Admin Logs Functions
+# -----------------------
+
+def log_admin_action(admin_id, action):
+    admin_logs_collection.insert_one({
+        "admin_id": admin_id,
+        "action": action,
+        "timestamp": datetime.now()
+    })
+
+# -----------------------
+# Key Functions
+# -----------------------
+
+def get_key(key_str):
+    return keys_collection.find_one({"key": key_str})
+
+def claim_key_in_db(key_str, telegram_id):
+    key_doc = keys_collection.find_one({"key": key_str})
+    if not key_doc:
+        return "Key not found."
+    if key_doc.get("claimed", False):
+        return "Key already claimed."
+    points_awarded = key_doc.get("points", 0)
+    # Mark the key as claimed
+    keys_collection.update_one(
+        {"key": key_str},
+        {"$set": {"claimed": True, "claimed_by": telegram_id, "claimed_at": datetime.now()}}
+    )
+    # Increment user's points
+    users_collection.update_one(
+        {"telegram_id": telegram_id},
+        {"$inc": {"points": points_awarded}}
+    )
+    return f"Key redeemed successfully. You've been awarded {points_awarded} points."
+
+def add_key(key_str, key_type, points):
+    keys_collection.insert_one({
+        "key": key_str,
+        "type": key_type,
+        "points": points,
+        "claimed": False,
+        "claimed_by": None,
+        "timestamp": datetime.now()
+    })
+
+def get_keys():
+    return list(keys_collection.find())
+
+# -----------------------
+# Dynamic Configuration Functions
+# -----------------------
+
+def set_config_value(key, value):
+    configurations_collection.update_one(
+        {"key": key},
+        {"$set": {"value": value}},
+        upsert=True
+    )
+
+def get_config_value(key):
+    doc = configurations_collection.find_one({"key": key})
+    if doc:
+        return doc.get("value")
+    return None
+
+def set_account_claim_cost(cost):
+    set_config_value("account_claim_cost", cost)
+
+def get_account_claim_cost():
+    cost = get_config_value("account_claim_cost")
+    return cost if cost is not None else 2  # Default cost is 2 points
+
+def set_referral_bonus(bonus):
+    set_config_value("referral_bonus", bonus)
+
+def get_referral_bonus():
+    bonus = get_config_value("referral_bonus")
+    return bonus if bonus is not None else 4  # Default bonus is 4 points
+
+# -----------------------
+# Additional Functions
+# -----------------------
+
+def get_leaderboard(limit=10):
+    """
+    Returns top users sorted by points.
+    """
+    cursor = users_collection.find({}, {"telegram_id": 1, "username": 1, "points": 1}).sort("points", -1).limit(limit)
+    return list(cursor)
+
+def get_admin_dashboard():
+    total_users = users_collection.count_documents({})
+    banned_users = users_collection.count_documents({"banned": True})
+    pipeline = [{"$group": {"_id": None, "total_points": {"$sum": "$points"}}}]
+    result = list(users_collection.aggregate(pipeline))
+    total_points = result[0]["total_points"] if result else 0
+    return total_users, banned_users, total_points
+
+# -----------------------
+# Main Block for Testing
+# -----------------------
 
 if __name__ == '__main__':
-    init_db()
-    print("✅ Database initialized!")
+    # For testing: print a sample user (if exists)
+    test_user = get_user("123456")
+    print("Test user:", test_user)
