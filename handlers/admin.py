@@ -573,13 +573,17 @@ def admin_callback_handler(bot, call):
     # data format: "admin_user_{user_id}"
     user_id = data.split("_")[2]
     handle_user_management_detail(bot, call, user_id)
-elif data.startswith("admin_user_") and data.count("_") == 3:
-    # data format: "admin_user_{user_id}_ban" or "admin_user_{user_id}_unban"
-    parts = data.split("_")
-    user_id = parts[2]
-    action = parts[3]
-    handle_user_ban_action(bot, call, user_id, action)
-elif data == "back_main":
+elif data.startswith("admin_user_") and data.count("_") == 2:
+        # data format: "admin_user_{user_id}"
+        user_id = data.split("_")[2]
+        handle_user_management_detail(bot, call, user_id)
+    elif data.startswith("admin_user_") and data.count("_") == 3:
+        # data format: "admin_user_{user_id}_ban" or "admin_user_{user_id}_unban"
+        parts = data.split("_")
+        user_id = parts[2]
+        action = parts[3]
+        handle_user_ban_action(bot, call, user_id, action)
+    elif data == "back_main":
         from handlers.main_menu import send_main_menu
         send_main_menu(bot, call)
     else:
