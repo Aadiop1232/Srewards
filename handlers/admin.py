@@ -34,6 +34,17 @@ from handlers.logs import log_event
 # Platform Management Functions
 # -----------------------
 
+def is_admin(user_or_id):
+    """
+    Returns True if the given user (or user ID) is an admin or owner.
+    """
+    try:
+        user_id = str(user_or_id.id)
+    except AttributeError:
+        user_id = str(user_or_id)
+    return user_id in config.OWNERS or user_id in config.ADMINS
+
+
 def add_platform(platform_name):
     if platforms_collection.find_one({"platform_name": platform_name}):
         return f"Platform '{platform_name}' already exists."
