@@ -14,15 +14,14 @@ def send_main_menu(bot, update):
 
     markup = types.InlineKeyboardMarkup(row_width=3)
     markup.add(
-        types.InlineKeyboardButton("Rewards", callback_data="menu_rewards"),
-        types.InlineKeyboardButton("Info", callback_data="menu_info"),
-        types.InlineKeyboardButton("Referral", callback_data="menu_referral")
+        types.InlineKeyboardButton("🎉 Rewards", callback_data="menu_rewards"),
+        types.InlineKeyboardButton("👥 Info", callback_data="menu_info"),
+        types.InlineKeyboardButton("🤝 Referral", callback_data="menu_referral")
     )
     markup.add(
-        types.InlineKeyboardButton("Review", callback_data="menu_review"),
-        types.InlineKeyboardButton("Support", callback_data="menu_support")
+        types.InlineKeyboardButton("📠 Review", callback_data="menu_review"),
     )
     if is_admin(user):
-        markup.add(types.InlineKeyboardButton("Admin Panel", callback_data="menu_admin"))
+        markup.add(types.InlineKeyboardButton("🔨 Admin Panel", callback_data="menu_admin"))
     bot.send_message(chat_id, "Main Menu\nPlease choose an option:", reply_markup=markup)
     
