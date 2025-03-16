@@ -6,9 +6,10 @@ from handlers.admin import is_admin
 def send_main_menu(bot, update):
     """
     Sends the main menu to the user.
-    Includes buttons for Rewards, Account Info, Referral, Review, Report,
-    and if the user is an admin, the Admin Panel.
+    Buttons include: Rewards, Account Info, Referral, Review, Report.
+    If the user is an admin, an Admin Panel button is also added.
     """
+    # Determine chat ID and user object
     if hasattr(update, "message"):
         chat_id = update.message.chat.id
         user_obj = update.from_user
