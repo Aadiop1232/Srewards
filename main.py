@@ -9,7 +9,17 @@ from handlers.referral import extract_referral_code, process_verified_referral, 
 from handlers.rewards import send_rewards_menu, handle_platform_selection, claim_account
 from handlers.review import prompt_review
 from handlers.account_info import send_account_info
-from handlers.admin import send_admin_menu, admin_callback_handler, is_admin, lend_points, update_account_claim_cost, update_referral_bonus
+from handlers.admin import (
+    send_admin_menu,
+    admin_callback_handler,
+    is_admin,
+    lend_points,
+    update_account_claim_cost,
+    update_referral_bonus,
+    generate_normal_key,
+    generate_premium_key,
+    add_key
+)
 from handlers.logs import log_event
 
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
@@ -56,17 +66,15 @@ def gen_command(message):
         return
     generated = []
     if key_type == "normal":
-        from handlers.admin import generate_normal_key  # Already defined
+        from handlers.admin import generate_normal_key, add_key
         for _ in range(qty):
             key = generate_normal_key()
-            from handlers.admin import add_key  # Already defined
             add_key(key, "normal", 15)
             generated.append(key)
     elif key_type == "premium":
-        from handlers.admin import generate_premium_key  # Already defined or implemented similarly
+        from handlers.admin import generate_premium_key, add_key
         for _ in range(qty):
             key = generate_premium_key()
-            from handlers.admin import add_key
             add_key(key, "premium", 35)
             generated.append(key)
     else:
@@ -183,7 +191,7 @@ def process_report(message):
     bot.send_message(message.chat.id, "✅ Your report has been submitted. Thank you!")
     log_event(bot, "report", f"User {message.from_user.id} submitted a report.")
 
-# New callback handler for Report button on claimed account
+# Callback query handler for Report button on claimed account
 @bot.callback_query_handler(func=lambda call: call.data == "report_account")
 def callback_report_account(call):
     msg = bot.send_message(call.message.chat.id, "📝 Please type your report message and attach an image (if any):")
@@ -207,7 +215,8 @@ def process_account_report(message):
     bot.send_message(message.chat.id, "✅ Your report has been submitted. Thank you!")
     log_event(bot, "report", f"User {message.from_user.id} submitted a report: {report_text}")
 
-# Callback query handlers for other menu commands
+# Callback query handlers for menu navigation and admin commands
+
 @bot.callback_query_handler(func=lambda call: call.data == "back_main")
 def callback_back_main(call):
     try:
@@ -273,4 +282,3 @@ def callback_menu_review(call):
     prompt_review(bot, call.message)
 
 bot.polling(none_stop=True)
-                     
