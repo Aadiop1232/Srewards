@@ -4,6 +4,7 @@ from datetime import datetime
 import json
 import config
 
+# Path to the SQLite database file. This file will be created in the project root.
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bot.db")
 
 def get_connection():
@@ -11,8 +12,10 @@ def get_connection():
     return sqlite3.connect(DATABASE)
 
 def init_db():
+    """Initializes the database schema by creating all necessary tables if they do not exist."""
     conn = get_connection()
     c = conn.cursor()
+    # Users table
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             telegram_id TEXT PRIMARY KEY,
@@ -24,6 +27,7 @@ def init_db():
             pending_referrer TEXT
         )
     ''')
+    # Referrals table
     c.execute('''
         CREATE TABLE IF NOT EXISTS referrals (
             user_id TEXT,
@@ -31,6 +35,7 @@ def init_db():
             PRIMARY KEY (user_id, referred_id)
         )
     ''')
+    # Platforms table
     c.execute(f'''
         CREATE TABLE IF NOT EXISTS platforms (
             platform_name TEXT PRIMARY KEY,
@@ -38,6 +43,7 @@ def init_db():
             price INTEGER DEFAULT {config.DEFAULT_ACCOUNT_CLAIM_COST}
         )
     ''')
+    # Reviews table
     c.execute('''
         CREATE TABLE IF NOT EXISTS reviews (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,6 +52,7 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    # Admin logs table
     c.execute('''
         CREATE TABLE IF NOT EXISTS admin_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,12 +61,14 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    # Channels table
     c.execute('''
         CREATE TABLE IF NOT EXISTS channels (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             channel_link TEXT
         )
     ''')
+    # Admins table
     c.execute('''
         CREATE TABLE IF NOT EXISTS admins (
             user_id TEXT PRIMARY KEY,
@@ -68,6 +77,7 @@ def init_db():
             banned INTEGER DEFAULT 0
         )
     ''')
+    # Keys table
     c.execute('''
         CREATE TABLE IF NOT EXISTS keys (
             key TEXT PRIMARY KEY,
@@ -78,6 +88,7 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    # Configurations table
     c.execute('''
         CREATE TABLE IF NOT EXISTS configurations (
             config_key TEXT PRIMARY KEY,
@@ -89,7 +100,9 @@ def init_db():
     conn.close()
     print("Database initialized.")
 
+# -----------------------
 # Dynamic Configuration Functions
+# -----------------------
 
 def set_config_value(key, value):
     conn = get_connection()
@@ -122,7 +135,9 @@ def get_referral_bonus():
     bonus = get_config_value("referral_bonus")
     return int(bonus) if bonus is not None else config.DEFAULT_REFERRAL_BONUS
 
+# -----------------------
 # User Functions
+# -----------------------
 
 def add_user(telegram_id, username, join_date, pending_referrer=None):
     conn = get_connection()
@@ -173,7 +188,9 @@ def unban_user(telegram_id):
     c.close()
     conn.close()
 
+# -----------------------
 # Referral Functions
+# -----------------------
 
 def add_referral(referrer_id, referred_id):
     conn = get_connection()
@@ -196,7 +213,9 @@ def clear_pending_referral(telegram_id):
     c.close()
     conn.close()
 
+# -----------------------
 # Review Functions
+# -----------------------
 
 def add_review(user_id, review_text):
     conn = get_connection()
@@ -206,7 +225,9 @@ def add_review(user_id, review_text):
     c.close()
     conn.close()
 
+# -----------------------
 # Admin Logs Functions
+# -----------------------
 
 def log_admin_action(admin_id, action):
     conn = get_connection()
@@ -216,7 +237,9 @@ def log_admin_action(admin_id, action):
     c.close()
     conn.close()
 
+# -----------------------
 # Key Functions
+# -----------------------
 
 def get_key(key_str):
     conn = get_connection()
@@ -271,7 +294,9 @@ def get_keys():
     conn.close()
     return [dict(k) for k in keys]
 
+# -----------------------
 # Additional Functions
+# -----------------------
 
 def get_leaderboard(limit=10):
     conn = get_connection()
@@ -295,6 +320,23 @@ def get_admin_dashboard():
     c.close()
     conn.close()
     return total_users, banned_users, total_points
+
+# -----------------------
+# NEW FUNCTION: get_platforms
+# -----------------------
+
+def get_platforms():
+    """
+    Retrieve all platforms from the database as a list of dictionaries.
+    """
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM platforms")
+    platforms = c.fetchall()
+    c.close()
+    conn.close()
+    return [dict(p) for p in platforms]
 
 if __name__ == '__main__':
     init_db()
