@@ -19,43 +19,25 @@ def is_admin(user_or_id):
 # -----------------------
 # PLATFORM MANAGEMENT FUNCTIONS
 # -----------------------
-def handle_admin_platform(bot, call):
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        types.InlineKeyboardButton("➕ Add Platform", callback_data="admin_platform_add"),
-        types.InlineKeyboardButton("➖ Remove Platform", callback_data="admin_platform_remove")
-    )
-    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
-    try:
-        bot.edit_message_text("Platform Management Options:", chat_id=call.message.chat.id, 
-                                message_id=call.message.message_id, reply_markup=markup)
-    except Exception:
-        bot.send_message(call.message.chat.id, "Platform Management Options:", reply_markup=markup)
 
-
-def handle_admin_platform_add(bot, call):
-    msg = bot.send_message(call.message.chat.id, "Please send the platform name to add:")
-    bot.register_next_step_handler(msg, lambda m: process_platform_add(bot, m))
-
-def process_platform_add(bot, message):
-    platform_name = message.text.strip()
-    msg = bot.send_message(message.chat.id, f"Enter the price for platform '{platform_name}':")
-    bot.register_next_step_handler(msg, lambda m: process_platform_price(bot, m, platform_name))
-
-def process_platform_price(bot, message, platform_name):
-    try:
-        price = int(message.text.strip())
-    except ValueError:
-        bot.send_message(message.chat.id, "Invalid price. Please enter a valid number.")
-        return
-    error = add_platform(platform_name, price)
-    if error:
-        response = error
-    else:
-        response = f"Platform '{platform_name}' added successfully with price {price} points."
-    bot.send_message(message.chat.id, response)
-    send_admin_menu(bot, message)
-    
+def add_platform(platform_name, price):
+    """
+    Add a new platform with a custom price.
+    """
+    conn = __import__('db').get_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM platforms WHERE platform_name = ?", (platform_name,))
+    if c.fetchone():
+        c.close()
+        conn.close()
+        return f"Platform '{platform_name}' already exists."
+    c.execute("INSERT INTO platforms (platform_name, stock, price) VALUES (?, ?, ?)", 
+              (platform_name, "[]", price))
+    conn.commit()
+    c.close()
+    conn.close()
+    log_event(telebot.TeleBot(config.TOKEN), "platform", f"Platform '{platform_name}' added with price {price} points.")
+    return None
 
 def remove_platform(platform_name):
     conn = __import__('db').get_connection()
@@ -283,16 +265,29 @@ def send_admin_menu(bot, update):
         bot.send_message(chat_id, "🛠 Admin Panel", reply_markup=markup)
 
 # ----- PLATFORM MANAGEMENT HANDLERS -----
-# New Platform Addition Flow
+
+def handle_admin_platform(bot, call):
+    # This function displays options for platform management.
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("➕ Add Platform", callback_data="admin_platform_add"),
+        types.InlineKeyboardButton("➖ Remove Platform", callback_data="admin_platform_remove")
+    )
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
+    try:
+        bot.edit_message_text("Platform Management Options:", chat_id=call.message.chat.id, 
+                                message_id=call.message.message_id, reply_markup=markup)
+    except Exception:
+        bot.send_message(call.message.chat.id, "Platform Management Options:", reply_markup=markup)
 
 def handle_admin_platform_add(bot, call):
     msg = bot.send_message(call.message.chat.id, "Please send the platform name to add:")
-    bot.register_next_step_handler(msg, process_platform_add)
+    bot.register_next_step_handler(msg, lambda m: process_platform_add(bot, m))
 
 def process_platform_add(bot, message):
     platform_name = message.text.strip()
     msg = bot.send_message(message.chat.id, f"Enter the price for platform '{platform_name}':")
-    bot.register_next_step_handler(msg, process_platform_price, platform_name)
+    bot.register_next_step_handler(msg, lambda m: process_platform_price(bot, m, platform_name))
 
 def process_platform_price(bot, message, platform_name):
     try:
@@ -324,7 +319,7 @@ def handle_admin_platform_remove(bot, call):
 def handle_admin_platform_rm(bot, call, platform_name):
     remove_platform(platform_name)
     bot.answer_callback_query(call.id, f"Platform '{platform_name}' removed.")
-    handle_admin_platform(bot, call)  # Assumes a function to show platform options exists
+    handle_admin_platform(bot, call)  # Show platform options again
 
 def handle_admin_stock(bot, call):
     platforms = get_platforms()
@@ -341,10 +336,10 @@ def handle_admin_stock(bot, call):
 
 def handle_admin_stock_platform(bot, call, platform_name):
     msg = bot.send_message(call.message.chat.id, f"Please send the stock text for platform '{platform_name}' (attach file or type text):")
-    bot.register_next_step_handler(msg, process_stock_upload_admin, platform_name)
+    bot.register_next_step_handler(msg, lambda m: process_stock_upload_admin(m, platform_name))
 
 def process_stock_upload_admin(message, platform_name):
-    # Support file upload or text input for stock
+    # Support for file upload or text input for stock.
     if message.content_type == "document":
         try:
             file_info = bot.get_file(message.document.file_id)
@@ -437,9 +432,9 @@ def handle_admin_list(bot, call):
 
 def handle_admin_ban_unban(bot, call):
     msg = bot.send_message(call.message.chat.id, "Please send the admin UserID to ban/unban:")
-    bot.register_next_step_handler(msg, process_admin_ban_unban)
+    bot.register_next_step_handler(msg, lambda m: process_admin_ban_unban(bot, m))
 
-def process_admin_ban_unban(message):
+def process_admin_ban_unban(bot, message):
     user_id = message.text.strip()
     from db import get_connection
     conn = get_connection()
@@ -458,37 +453,34 @@ def process_admin_ban_unban(message):
             response = f"Admin {user_id} has been banned."
     c.close()
     conn.close()
-    bot_instance = telebot.TeleBot(config.TOKEN)
-    bot_instance.send_message(message.chat.id, response)
-    send_admin_menu(bot_instance, message)
+    bot.send_message(message.chat.id, response)
+    send_admin_menu(bot, message)
 
 def handle_admin_remove(bot, call):
     msg = bot.send_message(call.message.chat.id, "Please send the admin UserID to remove:")
-    bot.register_next_step_handler(msg, process_admin_remove)
+    bot.register_next_step_handler(msg, lambda m: process_admin_remove(bot, m))
 
-def process_admin_remove(message):
+def process_admin_remove(bot, message):
     user_id = message.text.strip()
     remove_admin(user_id)
     response = f"Admin {user_id} removed."
-    bot_instance = telebot.TeleBot(config.TOKEN)
-    bot_instance.send_message(message.chat.id, response)
-    send_admin_menu(bot_instance, message)
+    bot.send_message(message.chat.id, response)
+    send_admin_menu(bot, message)
 
 def handle_admin_add(bot, call):
     msg = bot.send_message(call.message.chat.id, "Please send the UserID and Username (separated by space) to add as admin:")
-    bot.register_next_step_handler(msg, process_admin_add)
+    bot.register_next_step_handler(msg, lambda m: process_admin_add(bot, m))
 
-def process_admin_add(message):
+def process_admin_add(bot, message):
     parts = message.text.strip().split()
-    bot_instance = telebot.TeleBot(config.TOKEN)
     if len(parts) < 2:
         response = "Please provide both UserID and Username."
     else:
         user_id, username = parts[0], " ".join(parts[1:])
         add_admin(user_id, username, role="admin")
         response = f"Admin {user_id} added with username {username}."
-    bot_instance.send_message(message.chat.id, response)
-    send_admin_menu(bot_instance, message)
+    bot.send_message(message.chat.id, response)
+    send_admin_menu(bot, message)
 
 # ----- USER MANAGEMENT (Admin Panel) -----
 
@@ -507,8 +499,10 @@ def handle_user_management(bot, call):
         callback_data = f"admin_user_{uid}"
         markup.add(types.InlineKeyboardButton(btn_text, callback_data=callback_data))
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
-    bot.edit_message_text("User Management\nSelect a user to manage:", chat_id=call.message.chat.id,
-                            message_id=call.message.message_id, reply_markup=markup)
+    bot.edit_message_text("User Management\nSelect a user to manage:", 
+                            chat_id=call.message.chat.id,
+                            message_id=call.message.message_id,
+                            reply_markup=markup)
 
 def handle_user_management_detail(bot, call, user_id):
     user = get_user(user_id)
@@ -530,12 +524,10 @@ def handle_user_management_detail(bot, call, user_id):
         markup.add(types.InlineKeyboardButton("Ban", callback_data=f"admin_user_{user_id}_ban"))
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_users"))
     try:
-        bot.edit_message_text(
-            text, 
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id, 
-            reply_markup=markup
-        )
+        bot.edit_message_text(text, 
+                              chat_id=call.message.chat.id, 
+                              message_id=call.message.message_id, 
+                              reply_markup=markup)
     except Exception as e:
         bot.send_message(call.message.chat.id, text, reply_markup=markup)
 
@@ -553,10 +545,6 @@ def handle_user_ban_action(bot, call, user_id, action):
     bot.answer_callback_query(call.id, result_text)
     handle_user_management_detail(bot, call, user_id)
 
-# -----------------------
-# ADMIN CALLBACK ROUTER
-# -----------------------
-
 def admin_callback_handler(bot, call):
     data = call.data
     if not (str(call.from_user.id) in config.ADMINS or str(call.from_user.id) in config.OWNERS):
@@ -564,7 +552,7 @@ def admin_callback_handler(bot, call):
         return
 
     if data == "admin_platform":
-        handle_admin_platform(bot, call)  # You can add a handler to show platform options here.
+        handle_admin_platform(bot, call)
     elif data == "admin_platform_add":
         handle_admin_platform_add(bot, call)
     elif data == "admin_platform_remove":
