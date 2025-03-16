@@ -16,8 +16,18 @@ from handlers.logs import log_event
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
 init_db()
 
+def check_if_banned(message):
+    """Check if the user is banned. If so, send an error and return True."""
+    user = get_user(str(message.from_user.id))
+    if user and user.get("banned", 0):
+        bot.send_message(message.chat.id, "🚫 You are banned and cannot use this bot.")
+        return True
+    return False
+
 @bot.message_handler(commands=["start"])
 def start_command(message):
+    if check_if_banned(message):
+        return
     print(f"[DEBUG] /start received from user: {message.from_user.id}")
     user_id = str(message.from_user.id)
     user = get_user(user_id)
@@ -33,7 +43,7 @@ def start_command(message):
     # Process referral if pending_referrer exists in the user's record
     if user.get("pending_referrer"):
         process_verified_referral(user_id, bot)
-    if is_admin(message.from_user):
+    if is_admin(get_user(user_id)):  # Fetch the latest record from DB for admin check
         bot.send_message(message.chat.id, "✨ Welcome, Admin/Owner! You are automatically verified! ✨")
         send_main_menu(bot, message)
         return
@@ -42,6 +52,9 @@ def start_command(message):
 
 @bot.message_handler(commands=["lend"])
 def lend_command(message):
+    if check_if_banned(message):
+        return
+    # Only owners can use /lend
     if str(message.from_user.id) not in config.OWNERS:
         bot.reply_to(message, "🚫 You don't have permission to use this command.")
         return
@@ -58,10 +71,12 @@ def lend_command(message):
     custom_message = " ".join(parts[3:]) if len(parts) > 3 else None
     result = lend_points(message.from_user.id, user_id, points, custom_message)
     bot.reply_to(message, result)
-    log_event(bot, "lend", f"Admin {message.from_user.id} lent {points} pts to user {user_id}.", user=message.from_user)
+    log_event(bot, "lend", f"Owner {message.from_user.id} lent {points} pts to user {user_id}.", user=message.from_user)
 
 @bot.message_handler(commands=["redeem"])
 def redeem_command(message):
+    if check_if_banned(message):
+        return
     user_id = str(message.from_user.id)
     parts = message.text.split()
     if len(parts) < 2:
@@ -74,11 +89,15 @@ def redeem_command(message):
 
 @bot.message_handler(commands=["report"])
 def report_command(message):
+    if check_if_banned(message):
+        return
     msg = bot.send_message(message.chat.id, "📝 Please type your report message (you may attach a photo or document):")
     bot.register_next_step_handler(msg, lambda m: process_report(bot, m))
 
 @bot.message_handler(commands=["tutorial"])
 def tutorial_command(message):
+    if check_if_banned(message):
+        return
     text = (
         "📖 Tutorial\n"
         "1. Every new user starts with 20 points.\n"
@@ -93,6 +112,8 @@ def tutorial_command(message):
 
 @bot.message_handler(commands=["gen"])
 def gen_command(message):
+    if check_if_banned(message):
+        return
     if str(message.from_user.id) not in config.ADMINS and str(message.from_user.id) not in config.OWNERS:
         bot.reply_to(message, "🚫 You don't have permission to generate keys.")
         return
@@ -124,7 +145,6 @@ def gen_command(message):
         text = "Redeem Generated ✅\n"
         for key in generated:
             text += f"➔ <code>{key}</code>\n"
-        # Escape the angle brackets here for HTML
         text += "\nYou can redeem this code using this command: /redeem &lt;Key&gt;"
     else:
         text = "No keys generated."
@@ -137,7 +157,7 @@ def callback_back_main(call):
     except Exception as e:
         print("Error deleting message:", e)
     from handlers.main_menu import send_main_menu
-    send_main_menu(bot, call)  # Pass the full call to preserve admin info
+    send_main_menu(bot, call)  # Pass the full call object to preserve admin info
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("verify"))
 def callback_verify(call):
