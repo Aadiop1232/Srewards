@@ -170,11 +170,14 @@ def unban_admin(user_id):
 
 def generate_normal_key():
     import random, string
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
+    # Generate 10 random alphanumeric characters and prepend "NKEY-"
+    return "NKEY-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
 
 def generate_premium_key():
     import random, string
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
+    # Generate 10 random alphanumeric characters and prepend "PKEY-"
+    return "PKEY-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+
 
 def add_key(key_str, key_type, points):
     from db import get_connection
