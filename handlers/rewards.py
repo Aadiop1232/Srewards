@@ -109,7 +109,7 @@ def claim_account(bot, call, platform_name):
     
     # Prepare and send account details with an inline "Report" button
     account_message = (f"🎉 Account claimed!\nYour account for {platform_name}:\n<code>{account}</code>\n"
-                       f"Remaining points: {new_points}")
+                       f"Remaining points: {new_points} :  Facing Error? Click Below To Report The Issue")
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("Report", callback_data="report_account"))
     bot.send_message(call.message.chat.id, account_message, parse_mode="HTML", reply_markup=markup)
