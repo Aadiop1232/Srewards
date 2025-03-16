@@ -6,14 +6,20 @@ from handlers.admin import is_admin
 from handlers.main_menu import send_main_menu
 
 def check_channel_membership(bot, user_id):
+    """
+    Check if a user is a member of all required channels.
+    """
     for channel in config.REQUIRED_CHANNELS:
         try:
+            # Extract the channel username from the URL.
             channel_username = channel.rstrip('/').split("/")[-1]
             chat = bot.get_chat("@" + channel_username)
+            # Ensure the bot is an admin in the channel (needed for reliable membership checking).
             bot_member = bot.get_chat_member(chat.id, bot.get_me().id)
             if bot_member.status not in ["administrator", "creator"]:
                 print(f"Bot is not admin in {channel}")
                 return False
+            # Check the user's membership status.
             user_member = bot.get_chat_member(chat.id, user_id)
             if user_member.status not in ["member", "creator", "administrator"]:
                 return False
@@ -23,6 +29,12 @@ def check_channel_membership(bot, user_id):
     return True
 
 def send_verification_message(bot, message):
+    """
+    Sends a verification message to the user.
+    Admins bypass verification.
+    If the user is verified (i.e. a member of all required channels), the main menu is shown.
+    Otherwise, the user is prompted to join the required channels.
+    """
     if is_admin(message.from_user):
         bot.send_message(message.chat.id, "✨ Welcome, Admin/Owner! You are automatically verified! ✨")
         send_main_menu(bot, message)
@@ -41,6 +53,10 @@ def send_verification_message(bot, message):
         bot.send_message(message.chat.id, text, reply_markup=markup)
 
 def handle_verification_callback(bot, call):
+    """
+    Handles the callback from the verification button.
+    Rechecks channel membership and shows the main menu if verified.
+    """
     if check_channel_membership(bot, call.from_user.id):
         bot.answer_callback_query(call.id, "✅ Verification successful! 🎉")
         send_main_menu(bot, call.message)
