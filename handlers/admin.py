@@ -33,24 +33,29 @@ def handle_admin_platform(bot, call):
         bot.send_message(call.message.chat.id, "Platform Management Options:", reply_markup=markup)
 
 
-def add_platform(platform_name, price):
-    """
-    Add a new platform with a custom price.
-    """
-    conn = __import__('db').get_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM platforms WHERE platform_name = ?", (platform_name,))
-    if c.fetchone():
-        c.close()
-        conn.close()
-        return f"Platform '{platform_name}' already exists."
-    c.execute("INSERT INTO platforms (platform_name, stock, price) VALUES (?, ?, ?)", 
-              (platform_name, "[]", price))
-    conn.commit()
-    c.close()
-    conn.close()
-    log_event(telebot.TeleBot(config.TOKEN), "platform", f"Platform '{platform_name}' added with price {price} points.")
-    return None
+def handle_admin_platform_add(bot, call):
+    msg = bot.send_message(call.message.chat.id, "Please send the platform name to add:")
+    bot.register_next_step_handler(msg, lambda m: process_platform_add(bot, m))
+
+def process_platform_add(bot, message):
+    platform_name = message.text.strip()
+    msg = bot.send_message(message.chat.id, f"Enter the price for platform '{platform_name}':")
+    bot.register_next_step_handler(msg, lambda m: process_platform_price(bot, m, platform_name))
+
+def process_platform_price(bot, message, platform_name):
+    try:
+        price = int(message.text.strip())
+    except ValueError:
+        bot.send_message(message.chat.id, "Invalid price. Please enter a valid number.")
+        return
+    error = add_platform(platform_name, price)
+    if error:
+        response = error
+    else:
+        response = f"Platform '{platform_name}' added successfully with price {price} points."
+    bot.send_message(message.chat.id, response)
+    send_admin_menu(bot, message)
+    
 
 def remove_platform(platform_name):
     conn = __import__('db').get_connection()
