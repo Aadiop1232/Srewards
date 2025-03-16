@@ -62,9 +62,9 @@ def handle_platform_selection(bot, call, platform_name):
 def send_premium_account_info(bot, chat_id, platform_name, account_info):
     text = f"""🎉✨ 𝗣𝗥𝗘𝗠𝗜𝗨𝗠 𝗔𝗖𝗖𝗢𝗨𝗡𝗧 𝗨𝗡𝗟𝗢𝗖𝗞𝗘𝗗 
 
-✨🎉📦 𝗦𝗲𝗿𝘃𝗶𝗰𝗲: {platform_name} 🔑 𝗬𝗼𝘂𝗿  
+✨🎉📦 𝗦𝗲𝗿𝘃𝗶𝗰𝗲: {platform_name}
 
-𝗔𝗰𝗰𝗼𝗻𝘁: 
+🔑 𝗬𝗼𝘂𝗿 𝗔𝗰𝗰𝗼𝘂𝗻𝘁: 
 <code>{account_info}</code> 📌 
 
 𝗛𝗼𝘄 𝘁𝗼 𝗹𝗼𝗴𝗶𝗻:
