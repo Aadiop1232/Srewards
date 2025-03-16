@@ -565,4 +565,199 @@ def handle_admin_manage(bot, call):
     )
     markup.add(
         types.InlineKeyboardButton("âŒ Remove Admin", callback_data="admin_remove"),
+        types.InlineKeyboardButton("âž• Add Admin", callback_data="admin_add")
+    )
+    markup.add(types.InlineKeyboardButton("ðŸ”™ Back", callback_data="back_main"))
+    bot.edit_message_text("Admin Management", chat_id=call.message.chat.id,
+                          message_id=call.message.message_id, reply_markup=markup)
+
+def handle_admin_list(bot, call):
+    admins = get_admins()
+    if not admins:
+        text = "No admins found."
+    else:
+        text = "ðŸ‘¥ Admins:\n"
+        for admin in admins:
+            text += f"â€¢ UserID: {admin.get('user_id')}, Username: {admin.get('username')}, Role: {admin.get('role')}, Banned: {admin.get('banned')}\n"
+    bot.edit_message_text(text, chat_id=call.message.chat.id,
+                          message_id=call.message.message_id)
+
+def handle_admin_ban_unban(bot, call):
+    msg = bot.send_message(call.message.chat.id, "âœï¸ Send the admin UserID to ban/unban:")
+    bot.register_next_step_handler(msg, process_admin_ban_unban)
+
+def process_admin_ban_unban(message):
+    user_id = message.text.strip()
+    from db import get_connection
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM admins WHERE user_id = ?", (user_id,))
+    admin_doc = c.fetchone()
+    if not admin_doc:
+        response = "Admin not found."
+    else:
+        if admin_doc["banned"]:
+            unban_admin(user_id)
+            response = f"Admin {user_id} has been unbanned."
+        else:
+            ban_admin(user_id)
+            response = f"Admin {user_id} has been banned."
+    c.close()
+    conn.close()
+    bot_instance = telebot.TeleBot(config.TOKEN)
+    bot_instance.send_message(message.chat.id, response)
+    send_admin_menu(bot_instance, message)
+
+def handle_admin_remove(bot, call):
+    msg = bot.send_message(call.message.chat.id, "âœï¸ Send the admin UserID to remove:")
+    bot.register_next_step_handler(msg, process_admin_remove)
+
+def process_admin_remove(message):
+    user_id = message.text.strip()
+    remove_admin(user_id)
+    response = f"Admin {user_id} removed."
+    bot_instance = telebot.TeleBot(config.TOKEN)
+    bot_instance.send_message(message.chat.id, response)
+    send_admin_menu(bot_instance, message)
+
+def handle_admin_add(bot, call):
+    msg = bot.send_message(call.message.chat.id, "âœï¸ Send the UserID and Username (separated by space) to add as admin:")
+    bot.register_next_step_handler(msg, process_admin_add)
+
+def process_admin_add(message):
+    parts = message.text.strip().split()
+    bot_instance = telebot.TeleBot(config.TOKEN)
+    if len(parts) < 2:
+        response = "Please provide both UserID and Username."
+    else:
+        user_id, username = parts[0], " ".join(parts[1:])
+        add_admin(user_id, username, role="admin")
+        response = f"Admin {user_id} added with username {username}."
+    bot_instance.send_message(message.chat.id, response)
+    send_admin_menu(bot_instance, message)
+
+# -----------------------
+# USER MANAGEMENT (Admin Panel)
+# -----------------------
+
+def handle_user_management(bot, call):
+    users = get_all_users()
+    if not users:
+        bot.answer_callback_query(call.id, "No users found.")
+        return
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    for u in users:
+        uid = u.get("telegram_id")
+        username = u.get("username")
+        banned = u.get("banned", 0)
+        status = "Banned" if banned else "Active"
+        btn_text = f"{username} ({uid}) - {status}"
+        callback_data = f"admin_user_{uid}"
+        markup.add(types.InlineKeyboardButton(btn_text, callback_data=callback_data))
+    markup.add(types.InlineKeyboardButton("ðŸ”™ Back", callback_data="back_main"))
+    bot.edit_message_text("User Management\nSelect a user to manage:", chat_id=call.message.chat.id,
+                            message_id=call.message.message_id, reply_markup=markup)
+
+def handle_user_management_detail(bot, call, user_id):
+    user = get_user(user_id)
+    if not user:
+        bot.answer_callback_query(call.id, "User not found.")
+        return
+    status = "Banned" if user.get("banned", 0) else "Active"
+    text = (f"User Management\n\n"
+            f"User ID: {user.get('telegram_id')}\n"
+            f"Username: {user.get('username')}\n"
+            f"Join Date: {user.get('join_date')}\n"
+            f"Balance: {user.get('points')} points\n"
+            f"Total Referrals: {user.get('referrals')}\n"
+            f"Status: {status}")
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    if user.get("banned", 0):
+        markup.add(types.InlineKeyboardButton("Unban", callback_data=f"admin_user_{user_id}_unban"))
+    else:
+        markup.add(types.InlineKeyboardButton("Ban", callback_data=f"admin_user_{user_id}_ban"))
+    markup.add(types.InlineKeyboardButton("ðŸ”™ Back", callback_data="admin_users"))
+    try:
+        bot.edit_message_text(
+            text, 
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id, 
+            reply_markup=markup
+        )
+    except Exception as e:
+        bot.send_message(call.message.chat.id, text, reply_markup=markup)
+
+def handle_user_ban_action(bot, call, user_id, action):
+    if action == "ban":
+        ban_user(user_id)
+        result_text = f"User {user_id} has been banned."
+        log_event(bot, "ban", f"User {user_id} banned by admin {call.from_user.id}.")
+    elif action == "unban":
+        unban_user(user_id)
+        result_text = f"User {user_id} has been unbanned."
+        log_event(bot, "unban", f"User {user_id} unbanned by admin {call.from_user.id}.")
+    else:
+        result_text = "Invalid action."
+    bot.answer_callback_query(call.id, result_text)
+    handle_user_management_detail(bot, call, user_id)
+
+# -----------------------
+# ADMIN CALLBACK ROUTER
+# -----------------------
+
+def admin_callback_handler(bot, call):
+    data = call.data
+    if not (str(call.from_user.id) in config.ADMINS or str(call.from_user.id) in config.OWNERS):
+        bot.answer_callback_query(call.id, "Access prohibited.")
+        return
+
+    if data == "admin_platform":
+        handle_admin_platform(bot, call)
+    elif data == "admin_platform_add":
+        handle_admin_platform_add(bot, call)
+    elif data == "admin_platform_remove":
+        handle_admin_platform_remove(bot, call)
+    elif data.startswith("admin_platform_rm_"):
+        platform_name = data.split("admin_platform_rm_")[1]
+        handle_admin_platform_rm(bot, call, platform_name)
+    elif data == "admin_stock":
+        handle_admin_stock(bot, call)
+    elif data.startswith("admin_stock_"):
+        platform_name = data.split("admin_stock_")[1]
+        handle_admin_stock_platform(bot, call, platform_name)
+    elif data == "admin_channel":
+        handle_admin_channel(bot, call)
+    elif data == "admin_channel_add":
+        handle_admin_channel_add(bot, call)
+    elif data == "admin_channel_remove":
+        handle_admin_channel_remove(bot, call)
+    elif data.startswith("admin_channel_rm_"):
+        channel_id = data.split("admin_channel_rm_")[1]
+        handle_admin_channel_rm(bot, call, channel_id)
+    elif data == "admin_manage":
+        handle_admin_manage(bot, call)
+    elif data == "admin_list":
+        handle_admin_list(bot, call)
+    elif data == "admin_ban_unban":
+        handle_admin_ban_unban(bot, call)
+    elif data == "admin_remove":
+        handle_admin_remove(bot, call)
+    elif data == "admin_add":
+        handle_admin_add(bot, call)
+    elif data == "admin_users":
+        handle_user_management(bot, call)
+    elif data.startswith("admin_user_") and data.count("_") == 2:
+        user_id = data.split("_")[2]
+        handle_user_management_detail(bot, call, user_id)
+    elif data.startswith("admin_user_") and data.count("_") == 3:
+        parts = data.split("_")
+        user_id = parts[2]
+        action = parts[3]
+        handle_user_ban_action(bot, call, user_id, action)
+    elif data == "back_main":
+        from handlers.main_menu import send_main_menu
+        send_main_menu(bot, call.message)
+    else:
+        bot.answer_callback_query(call.id, "Unknown admin command.")
        
