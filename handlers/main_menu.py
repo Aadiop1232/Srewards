@@ -15,7 +15,7 @@ def send_main_menu(bot, update):
     markup = types.InlineKeyboardMarkup(row_width=3)
     markup.add(
         types.InlineKeyboardButton("🎉 Rewards", callback_data="menu_rewards"),
-        types.InlineKeyboardButton("👥 Info", callback_data="menu_info"),
+        types.InlineKeyboardButton("👥 Info", callback_data="account_info"),
         types.InlineKeyboardButton("🤝 Referral", callback_data="menu_referral")
     )
     markup.add(
