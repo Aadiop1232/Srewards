@@ -74,7 +74,10 @@ def send_premium_account_info(bot, chat_id, platform_name, account_info):
 
 ❌ 𝗔𝗰𝗰𝗼𝗻𝘁 𝗻𝗼𝘁 𝘄𝗼𝗿𝗸𝗶𝗻𝗴? 𝗥𝗲𝗽𝗼𝗿𝘁 𝗯𝗲𝗹𝗼𝘄 𝘁𝗼 𝗴𝗲𝘁 𝗮 𝗿𝗲𝗳𝘂𝗻𝗱 𝗼𝗳 𝘆𝗼𝘂𝗿 𝗽𝗼𝗶𝗻𝘁𝘀!
 By @shadowsquad0"""
-    bot.send_message(chat_id, text, parse_mode="HTML")
+    # Create an inline keyboard with a Report button.
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("Report", callback_data="menu_report"))
+    bot.send_message(chat_id, text, parse_mode="HTML", reply_markup=markup)
 
 def claim_account(bot, call, platform_name):
     user_id = str(call.from_user.id)
@@ -113,6 +116,6 @@ def claim_account(bot, call, platform_name):
     update_user_points(user_id, new_points)
     log_event(bot, "account_claim", f"User {user_id} claimed an account from {platform_name}. New balance: {new_points} pts.")
     
-    # Send the formatted premium account info
+    # Send the formatted premium account info with a report button
     send_premium_account_info(bot, call.message.chat.id, platform_name, account)
     
