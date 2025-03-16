@@ -28,8 +28,8 @@ def start_command(message):
             pending_referrer=pending_ref
         )
         user = get_user(user_id)
-    # Process referral if present
-    if pending_ref:
+    # Process referral if a pending referral exists
+    if user.get("pending_referrer"):
         process_verified_referral(user_id, bot)
     if is_admin(message.from_user):
         bot.send_message(message.chat.id, "✨ Welcome, Admin/Owner! You are automatically verified! ✨")
@@ -89,7 +89,6 @@ def tutorial_command(message):
     )
     bot.send_message(message.chat.id, text, parse_mode="HTML")
 
-# Callback handler for "Back" – ensures that the full call object is passed so admin info is preserved.
 @bot.callback_query_handler(func=lambda call: call.data == "back_main")
 def callback_back_main(call):
     try:
@@ -97,7 +96,7 @@ def callback_back_main(call):
     except Exception as e:
         print("Error deleting message:", e)
     from handlers.main_menu import send_main_menu
-    send_main_menu(bot, call)
+    send_main_menu(bot, call)  # Pass the full call object so that call.from_user is used
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("verify"))
 def callback_verify(call):
@@ -133,7 +132,6 @@ def callback_menu(call):
     else:
         bot.answer_callback_query(call.id, "Unknown menu command.")
 
-# New callback for generating referral link.
 @bot.callback_query_handler(func=lambda call: call.data == "get_ref_link")
 def callback_get_ref_link(call):
     from handlers.referral import get_referral_link
