@@ -102,7 +102,9 @@ def init_db():
     conn.close()
     print("Database initialized.")
 
+# -----------------------
 # Dynamic Configuration Functions
+# -----------------------
 
 def set_config_value(key, value):
     conn = get_connection()
@@ -135,7 +137,9 @@ def get_referral_bonus():
     bonus = get_config_value("referral_bonus")
     return int(bonus) if bonus is not None else config.DEFAULT_REFERRAL_BONUS
 
+# -----------------------
 # User Functions
+# -----------------------
 
 def add_user(telegram_id, username, join_date, pending_referrer=None):
     conn = get_connection()
@@ -186,7 +190,9 @@ def unban_user(telegram_id):
     c.close()
     conn.close()
 
+# -----------------------
 # Referral Functions
+# -----------------------
 
 def add_referral(referrer_id, referred_id):
     conn = get_connection()
@@ -209,7 +215,9 @@ def clear_pending_referral(telegram_id):
     c.close()
     conn.close()
 
+# -----------------------
 # Review Functions
+# -----------------------
 
 def add_review(user_id, review_text):
     conn = get_connection()
@@ -219,7 +227,9 @@ def add_review(user_id, review_text):
     c.close()
     conn.close()
 
+# -----------------------
 # Admin Logs Functions
+# -----------------------
 
 def log_admin_action(admin_id, action):
     conn = get_connection()
@@ -229,7 +239,9 @@ def log_admin_action(admin_id, action):
     c.close()
     conn.close()
 
+# -----------------------
 # Key Functions
+# -----------------------
 
 def get_key(key_str):
     conn = get_connection()
@@ -284,7 +296,9 @@ def get_keys():
     conn.close()
     return [dict(k) for k in keys]
 
+# -----------------------
 # Additional Functions
+# -----------------------
 
 def get_leaderboard(limit=10):
     conn = get_connection()
@@ -309,7 +323,10 @@ def get_admin_dashboard():
     conn.close()
     return total_users, banned_users, total_points
 
-# get_platforms is already defined above; here we alias it.
+# -----------------------
+# get_platforms and update_stock_for_platform
+# -----------------------
+
 def get_platforms():
     conn = get_connection()
     conn.row_factory = sqlite3.Row
@@ -327,7 +344,7 @@ def update_stock_for_platform(platform_name, stock):
     conn.commit()
     c.close()
     conn.close()
-    # Log the update (create a TeleBot instance for logging)
+    # Log the update using a TeleBot instance for logging.
     log_event(telebot.TeleBot(config.TOKEN), "stock", f"Platform '{platform_name}' stock updated to {len(stock)} accounts.")
 
 if __name__ == '__main__':
