@@ -20,13 +20,12 @@ def send_main_menu(bot, update):
 
     markup = types.InlineKeyboardMarkup(row_width=3)
     markup.add(
-        types.InlineKeyboardButton("Rewards", callback_data="menu_rewards"),
-        types.InlineKeyboardButton("Info", callback_data="menu_info"),
-        types.InlineKeyboardButton("Referral", callback_data="menu_referral")
+        types.InlineKeyboardButton("🎉 Rewards", callback_data="menu_rewards"),
+        types.InlineKeyboardButton("👥 Info", callback_data="menu_info"),
+        types.InlineKeyboardButton("🤝 Referral", callback_data="menu_referral")
     )
     markup.add(
-        types.InlineKeyboardButton("Review", callback_data="menu_review"),
-        types.InlineKeyboardButton("Support", callback_data="menu_support")
+        types.InlineKeyboardButton("📠 Review", callback_data="menu_review")
     )
     # Include Admin Panel button if the user is admin.
     if is_admin(user):
