@@ -74,7 +74,8 @@ def handle_platform_selection(bot, call, platform_name):
 
 def send_premium_account(bot, chat_id, platform_name, account):
     """
-    Sends the premium account message using the given text and attaches a Report button.
+    Sends the premium account message with the provided text,
+    and attaches a "Report" button to allow the user to report issues.
     """
     text = (
         "🎉✨ <b>𝗣𝗥𝗘𝗠𝗜𝗨𝗠 𝗔𝗖𝗖𝗢𝗨𝗡𝗧 𝗨𝗡𝗟𝗢𝗖𝗞𝗘𝗗</b> ✨🎉\n"
@@ -88,6 +89,7 @@ def send_premium_account(bot, chat_id, platform_name, account):
         "By @shadowsquad0"
     )
     markup = types.InlineKeyboardMarkup(row_width=1)
+    # Report button added here. Its callback data "report_account" should be handled in your report handler.
     markup.add(types.InlineKeyboardButton("Report", callback_data="report_account"))
     bot.send_message(chat_id, text, parse_mode="HTML", reply_markup=markup)
 
@@ -141,4 +143,4 @@ def claim_account(bot, call, platform_name):
     log_event(bot, "account_claim", f"User {user_id} claimed an account from {platform_name}. "
                                      f"Account: {account}. New balance: {new_points} pts.")
     send_premium_account(bot, call.message.chat.id, platform_name, account)
-    
+                              
