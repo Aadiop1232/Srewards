@@ -133,7 +133,8 @@ def callback_back_main(call):
     except Exception as e:
         print("Error deleting message:", e)
     from handlers.main_menu import send_main_menu
-    send_main_menu(bot, call)  # Pass the full call so that call.from_user is used
+    send_main_menu(bot, call)  # Passing the call preserves call.from_user.
+
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("verify"))
 def callback_verify(call):
