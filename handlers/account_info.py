@@ -2,33 +2,29 @@
 from db import get_user, add_user
 from datetime import datetime
 
-def send_account_info(bot, update):
+def send_main_menu(bot, update):
+    # Extract chat ID and user info robustly:
     if hasattr(update, "message"):
         chat_id = update.message.chat.id
-        user_obj = update.from_user
-    elif hasattr(update, "data"):
+        user = update.message.from_user
+    elif hasattr(update, "data"):  # For CallbackQuery objects
         chat_id = update.message.chat.id
-        user_obj = update.from_user
+        user = update.from_user
     else:
         chat_id = update.chat.id
-        user_obj = update.from_user
+        user = update.from_user
 
-    telegram_id = str(user_obj.id)
-    user = get_user(telegram_id)
-    if not user:
-        add_user(
-            telegram_id,
-            user_obj.username or user_obj.first_name,
-            datetime.now().strftime("%Y-%m-%d")
-        )
-        user = get_user(telegram_id)
-    
-    text = (
-        "<b>👤 Account Info</b>\n"
-        f"• <b>Username:</b> {user.get('username')}\n"
-        f"• <b>User ID:</b> {user.get('telegram_id')}\n"
-        f"• <b>Join Date:</b> {user.get('join_date')}\n"
-        f"• <b>Balance:</b> {user.get('points')} points\n"
-        f"• <b>Total Referrals:</b> {user.get('referrals')}\n"
+    markup = types.InlineKeyboardMarkup(row_width=3)
+    markup.add(
+        types.InlineKeyboardButton("Rewards", callback_data="menu_rewards"),
+        types.InlineKeyboardButton("Info", callback_data="menu_info"),
+        types.InlineKeyboardButton("Referral", callback_data="menu_referral")
     )
-    bot.send_message(chat_id, text, parse_mode="HTML")
+    markup.add(
+        types.InlineKeyboardButton("Review", callback_data="menu_review"),
+        types.InlineKeyboardButton("Support", callback_data="menu_support")
+    )
+    if is_admin(user):
+        markup.add(types.InlineKeyboardButton("Admin Panel", callback_data="menu_admin"))
+    bot.send_message(chat_id, "Main Menu\nPlease choose an option:", reply_markup=markup)
+    
