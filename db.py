@@ -3,8 +3,10 @@ import os
 from datetime import datetime
 import json
 import config
+import telebot
+from handlers.logs import log_event
 
-# Path to the SQLite database file. This file will be created in the project root.
+# Path to the SQLite database file.
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bot.db")
 
 def get_connection():
@@ -100,9 +102,7 @@ def init_db():
     conn.close()
     print("Database initialized.")
 
-# -----------------------
 # Dynamic Configuration Functions
-# -----------------------
 
 def set_config_value(key, value):
     conn = get_connection()
@@ -135,9 +135,7 @@ def get_referral_bonus():
     bonus = get_config_value("referral_bonus")
     return int(bonus) if bonus is not None else config.DEFAULT_REFERRAL_BONUS
 
-# -----------------------
 # User Functions
-# -----------------------
 
 def add_user(telegram_id, username, join_date, pending_referrer=None):
     conn = get_connection()
@@ -188,9 +186,7 @@ def unban_user(telegram_id):
     c.close()
     conn.close()
 
-# -----------------------
 # Referral Functions
-# -----------------------
 
 def add_referral(referrer_id, referred_id):
     conn = get_connection()
@@ -213,9 +209,7 @@ def clear_pending_referral(telegram_id):
     c.close()
     conn.close()
 
-# -----------------------
 # Review Functions
-# -----------------------
 
 def add_review(user_id, review_text):
     conn = get_connection()
@@ -225,9 +219,7 @@ def add_review(user_id, review_text):
     c.close()
     conn.close()
 
-# -----------------------
 # Admin Logs Functions
-# -----------------------
 
 def log_admin_action(admin_id, action):
     conn = get_connection()
@@ -237,9 +229,7 @@ def log_admin_action(admin_id, action):
     c.close()
     conn.close()
 
-# -----------------------
 # Key Functions
-# -----------------------
 
 def get_key(key_str):
     conn = get_connection()
@@ -294,9 +284,7 @@ def get_keys():
     conn.close()
     return [dict(k) for k in keys]
 
-# -----------------------
 # Additional Functions
-# -----------------------
 
 def get_leaderboard(limit=10):
     conn = get_connection()
@@ -321,14 +309,8 @@ def get_admin_dashboard():
     conn.close()
     return total_users, banned_users, total_points
 
-# -----------------------
-# NEW FUNCTION: get_platforms
-# -----------------------
-
+# get_platforms is already defined above; here we alias it.
 def get_platforms():
-    """
-    Retrieve all platforms from the database as a list of dictionaries.
-    """
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
@@ -337,6 +319,16 @@ def get_platforms():
     c.close()
     conn.close()
     return [dict(p) for p in platforms]
+
+def update_stock_for_platform(platform_name, stock):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE platforms SET stock = ? WHERE platform_name = ?", (json.dumps(stock), platform_name))
+    conn.commit()
+    c.close()
+    conn.close()
+    # Log the update (create a TeleBot instance for logging)
+    log_event(telebot.TeleBot(config.TOKEN), "stock", f"Platform '{platform_name}' stock updated to {len(stock)} accounts.")
 
 if __name__ == '__main__':
     init_db()
