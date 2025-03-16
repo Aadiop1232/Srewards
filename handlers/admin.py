@@ -338,8 +338,7 @@ def handle_admin_stock_platform(bot, call, platform_name):
     msg = bot.send_message(call.message.chat.id, f"Please send the stock text for platform '{platform_name}' (attach file or type text):")
     bot.register_next_step_handler(msg, lambda m: process_stock_upload_admin(m, platform_name))
 
-def process_stock_upload_admin(message, platform_name):
-    # Support for file upload or text input for stock.
+def process_stock_upload_admin(bot, message, platform_name):
     if message.content_type == "document":
         try:
             file_info = bot.get_file(message.document.file_id)
@@ -360,6 +359,7 @@ def process_stock_upload_admin(message, platform_name):
     update_stock_for_platform(platform_name, accounts)
     bot.send_message(message.chat.id, f"Stock for '{platform_name}' updated with {len(accounts)} accounts.")
     send_admin_menu(bot, message)
+            
 
 # ----- CHANNEL MANAGEMENT HANDLERS -----
 
