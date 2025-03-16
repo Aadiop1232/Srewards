@@ -82,9 +82,11 @@ def send_premium_account(bot, chat_id, platform_name, account):
         "📦 <b>𝗦𝗲𝗿𝘃𝗶𝗰𝗲:</b> " + platform_name + "\n"
         "🔑 <b>𝗬𝗼𝘂𝗿 𝗔𝗰𝗰𝗼𝗻𝘁:</b> " + account + "\n"
         "📌 <b>𝗛𝗼𝘄 𝘁𝗼 𝗹𝗼𝗴𝗶𝗻:</b>\n"
+        "                      "
         "1️⃣ Copy the details\n"
         "2️⃣ Open app/website\n"
         "3️⃣ Paste & login\n"
+        "                "
         "❌ <b>𝗔𝗰𝗰𝗼𝗻𝘁 𝗻𝗼𝘁 𝘄𝗼𝗿𝗸𝗶𝗻𝗴?</b> Report below to get a refund of your points!\n"
         "By @shadowsquad0"
     )
