@@ -5,7 +5,7 @@ import config
 from datetime import datetime
 from telebot import types
 import telebot
-from db import get_user, ban_user, unban_user, get_all_users, update_user_points, get_account_claim_cost
+from db import get_user, ban_user, unban_user, update_user_points, get_account_claim_cost
 from handlers.logs import log_event
 
 # Check if a user is admin or owner
