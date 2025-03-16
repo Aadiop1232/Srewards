@@ -339,20 +339,30 @@ def handle_admin_stock_platform(bot, call, platform_name):
     bot.register_next_step_handler(msg, lambda m: process_stock_upload_admin(bot, m, platform_name))
 
 
-def process_stock_upload_admin(bot, message, platform_name):
+def process_stock_upload_admin(bot, message, platform_name, retries=3):
     if message.content_type == "document":
-        try:
-            file_info = bot.get_file(message.document.file_id)
-            downloaded_file = bot.download_file(file_info.file_path)
+        for attempt in range(retries):
             try:
-                data = downloaded_file.decode('utf-8')
-            except UnicodeDecodeError:
-                data = downloaded_file.decode('latin-1', errors='replace')
-        except Exception as e:
-            bot.send_message(message.chat.id, f"Error downloading file: {e}")
-            return
+                file_info = bot.get_file(message.document.file_id)
+                downloaded_file = bot.download_file(file_info.file_path)
+                try:
+                    data = downloaded_file.decode('utf-8')
+                except UnicodeDecodeError:
+                    data = downloaded_file.decode('latin-1', errors='replace')
+                break  # Success, exit the retry loop.
+            except Exception as e:
+                if attempt < retries - 1:
+                    # Optionally wait before retrying
+                    import time
+                    time.sleep(2)
+                    continue
+                else:
+                    bot.send_message(message.chat.id, f"Error downloading file: {e}")
+                    return
     else:
         data = message.text.strip()
+
+    # Process the data as before...
     if "\n\n" in data:
         accounts = [block.strip() for block in data.split("\n\n") if block.strip()]
     else:
@@ -360,6 +370,7 @@ def process_stock_upload_admin(bot, message, platform_name):
     update_stock_for_platform(platform_name, accounts)
     bot.send_message(message.chat.id, f"Stock for '{platform_name}' updated with {len(accounts)} accounts.")
     send_admin_menu(bot, message)
+    
         
             
 
