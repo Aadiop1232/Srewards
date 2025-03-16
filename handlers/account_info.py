@@ -1,3 +1,4 @@
+# handlers/account_info.py
 from db import get_user, add_user
 from datetime import datetime
 
@@ -31,4 +32,4 @@ def send_account_info(bot, update):
         f"• <b>Total Referrals:</b> {user.get('referrals')}\n"
     )
     bot.send_message(chat_id, text, parse_mode="HTML")
-        
+    
