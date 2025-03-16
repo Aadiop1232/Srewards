@@ -10,7 +10,7 @@ def send_rewards_menu(bot, message):
     """
     Displays a menu of available platforms.
     """
-    from db import get_platforms  # Make sure get_platforms is defined in db.py
+    from db import get_platforms  # Ensure get_platforms is defined in db.py
     platforms = get_platforms()
     if not platforms:
         bot.send_message(message.chat.id, "😢 No platforms available at the moment.")
@@ -74,7 +74,7 @@ def handle_platform_selection(bot, call, platform_name):
 
 def send_premium_account(bot, chat_id, platform_name, account):
     """
-    Sends the premium account message using the given text.
+    Sends the premium account message using the given text and attaches a Report button.
     """
     text = (
         "🎉✨ <b>𝗣𝗥𝗘𝗠𝗜𝗨𝗠 𝗔𝗖𝗖𝗢𝗨𝗡𝗧 𝗨𝗡𝗟𝗢𝗖𝗞𝗘𝗗</b> ✨🎉\n"
@@ -87,7 +87,9 @@ def send_premium_account(bot, chat_id, platform_name, account):
         "❌ <b>𝗔𝗰𝗰𝗼𝗻𝘁 𝗻𝗼𝘁 𝘄𝗼𝗿𝗸𝗶𝗻𝗴?</b> Report below to get a refund of your points!\n"
         "By @shadowsquad0"
     )
-    bot.send_message(chat_id, text, parse_mode="HTML")
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(types.InlineKeyboardButton("Report", callback_data="report_account"))
+    bot.send_message(chat_id, text, parse_mode="HTML", reply_markup=markup)
 
 def claim_account(bot, call, platform_name):
     """
