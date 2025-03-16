@@ -1,100 +1,50 @@
-import json
 import sqlite3
-import telebot
-from telebot import types
+import json
 import config
-from db import (
-    get_connection,
-    get_user,
-    ban_user,
-    unban_user,
-    get_all_users,
-    update_user_points,
-    log_admin_action,
-    set_config_value,
-)
+from telebot import types
+import telebot
+from db import get_user, ban_user, unban_user, get_all_users, update_user_points
+from handlers.logs import log_event
+
+# Check if a user is admin or owner
+def is_admin(user_or_id):
+    try:
+        user_id = str(user_or_id.id)
+    except AttributeError:
+        user_id = str(user_or_id)
+    return user_id in config.OWNERS or user_id in config.ADMINS
 
 # -----------------------
-# Helper Functions
-# -----------------------
-
-def log_event(bot, event_type, message):
-    """
-    Log an event using the admin_logs table via log_admin_action.
-    For simplicity, we're using "system" as the admin_id.
-    """
-    log_admin_action("system", f"{event_type}: {message}")
-
-def is_admin(user_id):
-    """
-    Check if the given user_id is an admin or owner.
-    """
-    return str(user_id) in config.ADMINS or str(user_id) in config.OWNERS
-
-# -----------------------
-# Platform Management Helpers
+# PLATFORM MANAGEMENT FUNCTIONS
 # -----------------------
 
 def add_platform(platform_name):
-    """
-    Add a new platform to the platforms table.
-    Initializes with an empty stock (as JSON array) and a default price of 0.
-    """
-    conn = get_connection()
+    conn = __import__('db').get_connection()
     c = conn.cursor()
-    try:
-        c.execute(
-            "INSERT INTO platforms (platform_name, stock, price) VALUES (?, ?, ?)",
-            (platform_name, json.dumps([]), 0)
-        )
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        return f"Error adding platform: {e}"
-    finally:
+    c.execute("SELECT * FROM platforms WHERE platform_name = ?", (platform_name,))
+    if c.fetchone():
         c.close()
         conn.close()
+        return f"Platform '{platform_name}' already exists."
+    c.execute("INSERT INTO platforms (platform_name, stock, price) VALUES (?, ?, ?)", 
+              (platform_name, "[]", get_account_claim_cost()))
+    conn.commit()
+    c.close()
+    conn.close()
+    log_event(telebot.TeleBot(config.TOKEN), "platform", f"Platform '{platform_name}' added.")
     return None
 
 def remove_platform(platform_name):
-    """
-    Remove a platform from the platforms table.
-    """
-    conn = get_connection()
+    conn = __import__('db').get_connection()
     c = conn.cursor()
-    try:
-        c.execute("DELETE FROM platforms WHERE platform_name = ?", (platform_name,))
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        return f"Error removing platform: {e}"
-    finally:
-        c.close()
-        conn.close()
-    return None
-
-def update_stock_for_platform(platform_name, stock):
-    """
-    Update the stock for a given platform.
-    """
-    conn = get_connection()
-    c = conn.cursor()
-    try:
-        c.execute("UPDATE platforms SET stock = ? WHERE platform_name = ?", (json.dumps(stock), platform_name))
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-    finally:
-        c.close()
-        conn.close()
-    # Log the update event
-    log_event(telebot.TeleBot(config.TOKEN), "stock", f"Platform '{platform_name}' stock updated to {len(stock)} accounts.")
+    c.execute("DELETE FROM platforms WHERE platform_name = ?", (platform_name,))
+    conn.commit()
+    c.close()
+    conn.close()
+    log_event(telebot.TeleBot(config.TOKEN), "platform", f"Platform '{platform_name}' removed.")
 
 def get_platforms():
-    """
-    Retrieve all platforms from the database.
-    """
-    conn = get_connection()
+    conn = __import__('db').get_connection()
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("SELECT * FROM platforms")
@@ -103,47 +53,54 @@ def get_platforms():
     conn.close()
     return [dict(p) for p in platforms]
 
+def add_stock_to_platform(platform_name, accounts):
+    conn = __import__('db').get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT stock FROM platforms WHERE platform_name = ?", (platform_name,))
+    row = c.fetchone()
+    current_stock = json.loads(row["stock"]) if row and row["stock"] else []
+    new_stock = current_stock + accounts
+    c.execute("UPDATE platforms SET stock = ? WHERE platform_name = ?", (json.dumps(new_stock), platform_name))
+    conn.commit()
+    c.close()
+    conn.close()
+    log_event(telebot.TeleBot(config.TOKEN), "stock", f"Added {len(accounts)} accounts to platform '{platform_name}'.")
+    return f"Stock updated with {len(accounts)} accounts."
+
+def update_stock_for_platform(platform_name, stock):
+    conn = __import__('db').get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE platforms SET stock = ? WHERE platform_name = ?", (json.dumps(stock), platform_name))
+    conn.commit()
+    c.close()
+    conn.close()
+    log_event(telebot.TeleBot(config.TOKEN), "stock", f"Platform '{platform_name}' stock updated to {len(stock)} accounts.")
+
 # -----------------------
-# Channel Management Functions
+# CHANNEL MANAGEMENT FUNCTIONS
 # -----------------------
 
 def add_channel(channel_link):
-    """
-    Add a channel to the channels table.
-    """
-    conn = get_connection()
+    conn = __import__('db').get_connection()
     c = conn.cursor()
-    try:
-        c.execute("INSERT INTO channels (channel_link) VALUES (?)", (channel_link,))
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-    finally:
-        c.close()
-        conn.close()
+    c.execute("INSERT INTO channels (channel_link) VALUES (?)", (channel_link,))
+    conn.commit()
+    c.close()
+    conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "channel", f"Channel '{channel_link}' added.")
 
 def remove_channel(channel_id):
-    """
-    Remove a channel from the channels table.
-    """
-    conn = get_connection()
+    conn = __import__('db').get_connection()
     c = conn.cursor()
-    try:
-        c.execute("DELETE FROM channels WHERE id = ?", (channel_id,))
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-    finally:
-        c.close()
-        conn.close()
+    c.execute("DELETE FROM channels WHERE id = ?", (channel_id,))
+    conn.commit()
+    c.close()
+    conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "channel", f"Channel with ID '{channel_id}' removed.")
 
 def get_channels():
-    """
-    Retrieve all channels.
-    """
-    conn = get_connection()
+    conn = __import__('db').get_connection()
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("SELECT * FROM channels")
@@ -153,14 +110,11 @@ def get_channels():
     return [dict(ch) for ch in channels]
 
 # -----------------------
-# Admin Management Functions
+# ADMINS MANAGEMENT FUNCTIONS
 # -----------------------
 
 def get_admins():
-    """
-    Retrieve all admins from the admins table.
-    """
-    conn = get_connection()
+    conn = __import__('db').get_connection()
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("SELECT * FROM admins")
@@ -170,79 +124,49 @@ def get_admins():
     return [dict(a) for a in admins]
 
 def add_admin(user_id, username, role="admin"):
-    """
-    Add or update an admin.
-    """
-    conn = get_connection()
+    conn = __import__('db').get_connection()
     c = conn.cursor()
-    try:
-        c.execute(
-            "REPLACE INTO admins (user_id, username, role, banned) VALUES (?, ?, ?, 0)",
-            (user_id, username, role)
-        )
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-    finally:
-        c.close()
-        conn.close()
+    c.execute("REPLACE INTO admins (user_id, username, role, banned) VALUES (?, ?, ?, 0)", (user_id, username, role))
+    conn.commit()
+    c.close()
+    conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "admin", f"Admin '{user_id}' ({username}) added with role '{role}'.")
 
 def remove_admin(user_id):
-    """
-    Remove an admin.
-    """
-    conn = get_connection()
+    conn = __import__('db').get_connection()
     c = conn.cursor()
-    try:
-        c.execute("DELETE FROM admins WHERE user_id = ?", (user_id,))
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-    finally:
-        c.close()
-        conn.close()
+    c.execute("DELETE FROM admins WHERE user_id = ?", (user_id,))
+    conn.commit()
+    c.close()
+    conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "admin", f"Admin '{user_id}' removed.")
 
 def ban_admin(user_id):
-    """
-    Ban an admin.
-    """
-    conn = get_connection()
+    conn = __import__('db').get_connection()
     c = conn.cursor()
-    try:
-        c.execute("UPDATE admins SET banned = 1 WHERE user_id = ?", (user_id,))
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-    finally:
-        c.close()
-        conn.close()
+    c.execute("UPDATE admins SET banned = 1 WHERE user_id = ?", (user_id,))
+    conn.commit()
+    c.close()
+    conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "admin", f"Admin '{user_id}' banned.")
 
 def unban_admin(user_id):
-    """
-    Unban an admin.
-    """
-    conn = get_connection()
+    conn = __import__('db').get_connection()
     c = conn.cursor()
-    try:
-        c.execute("UPDATE admins SET banned = 0 WHERE user_id = ?", (user_id,))
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-    finally:
-        c.close()
-        conn.close()
+    c.execute("UPDATE admins SET banned = 0 WHERE user_id = ?", (user_id,))
+    conn.commit()
+    c.close()
+    conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "admin", f"Admin '{user_id}' unbanned.")
 
 # -----------------------
-# Lending Points Function
+# LENDING POINTS
 # -----------------------
 
-def lend_points(admin_id, user_id, points):
+def lend_points(admin_id, user_id, points, custom_message=None):
     """
-    Lend points from an admin to a user.
+    Lend points to a user with an optional custom message.
+    Updates the user's balance and sends the message.
     """
     user = get_user(user_id)
     if not user:
@@ -250,34 +174,51 @@ def lend_points(admin_id, user_id, points):
     new_balance = user["points"] + points
     update_user_points(user_id, new_balance)
     log_event(telebot.TeleBot(config.TOKEN), "lend", f"Admin {admin_id} lent {points} points to user {user_id}.")
+    bot_instance = telebot.TeleBot(config.TOKEN)
+    if custom_message:
+        msg = custom_message
+    else:
+        msg = f"You have been lent {points} points. Your new balance is {new_balance} points."
+    try:
+        bot_instance.send_message(user_id, msg)
+    except Exception as e:
+        print(f"Error sending message to user {user_id}: {e}")
     return f"{points} points have been added to user {user_id}. New balance: {new_balance} points."
 
 # -----------------------
-# Dynamic Configuration Commands
+# DYNAMIC CONFIGURATION COMMANDS
 # -----------------------
 
 def update_account_claim_cost(cost):
-    """
-    Update the account claim cost configuration.
-    """
+    from db import set_config_value
     set_config_value("account_claim_cost", cost)
     log_event(telebot.TeleBot(config.TOKEN), "config", f"Account claim cost updated to {cost} points.")
 
 def update_referral_bonus(bonus):
-    """
-    Update the referral bonus configuration.
-    """
+    from db import set_config_value
     set_config_value("referral_bonus", bonus)
     log_event(telebot.TeleBot(config.TOKEN), "config", f"Referral bonus updated to {bonus} points.")
+
+# -----------------------
+# USER MANAGEMENT (for Admin Panel)
+# -----------------------
+
+def get_all_users():
+    from db import get_connection
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM users")
+    users = c.fetchall()
+    c.close()
+    conn.close()
+    return [dict(u) for u in users]
 
 # -----------------------
 # Admin Panel Callback Router and Handlers
 # -----------------------
 
 def send_admin_menu(bot, update):
-    """
-    Display the admin panel menu.
-    """
     # Determine chat_id and message_id based on update type.
     if isinstance(update, telebot.types.Message):
         chat_id = update.chat.id
@@ -312,10 +253,8 @@ def handle_admin_platform(bot, call):
         types.InlineKeyboardButton("➖ Remove Platform", callback_data="admin_platform_remove")
     )
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
-    bot.edit_message_text("Platform Management", 
-                          chat_id=call.message.chat.id,
-                          message_id=call.message.message_id, 
-                          reply_markup=markup)
+    bot.edit_message_text("Platform Management", chat_id=call.message.chat.id,
+                          message_id=call.message.message_id, reply_markup=markup)
 
 def handle_admin_platform_add(bot, call):
     msg = bot.send_message(call.message.chat.id, "✏️ Send the platform name to add:")
@@ -341,10 +280,8 @@ def handle_admin_platform_remove(bot, call):
         plat_name = plat.get("platform_name")
         markup.add(types.InlineKeyboardButton(plat_name, callback_data=f"admin_platform_rm_{plat_name}"))
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_platform"))
-    bot.edit_message_text("Select a platform to remove:", 
-                          chat_id=call.message.chat.id,
-                          message_id=call.message.message_id, 
-                          reply_markup=markup)
+    bot.edit_message_text("Select a platform to remove:", chat_id=call.message.chat.id,
+                          message_id=call.message.message_id, reply_markup=markup)
 
 def handle_admin_platform_rm(bot, call, platform_name):
     remove_platform(platform_name)
@@ -361,17 +298,14 @@ def handle_admin_stock(bot, call):
         plat_name = plat.get("platform_name")
         markup.add(types.InlineKeyboardButton(plat_name, callback_data=f"admin_stock_{plat_name}"))
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
-    bot.edit_message_text("Select a platform to update stock:", 
-                          chat_id=call.message.chat.id,
-                          message_id=call.message.message_id, 
-                          reply_markup=markup)
+    bot.edit_message_text("Select a platform to update stock:", chat_id=call.message.chat.id,
+                          message_id=call.message.message_id, reply_markup=markup)
 
 def handle_admin_stock_platform(bot, call, platform_name):
     msg = bot.send_message(call.message.chat.id, f"✏️ Send the stock text for platform {platform_name} (attach file or type text):")
     bot.register_next_step_handler(msg, process_stock_upload_admin, platform_name)
 
 def process_stock_upload_admin(message, platform_name):
-    # Determine data from text or document
     if message.content_type == "document":
         try:
             file_info = bot.get_file(message.document.file_id)
@@ -400,10 +334,8 @@ def handle_admin_channel(bot, call):
         types.InlineKeyboardButton("➖ Remove Channel", callback_data="admin_channel_remove")
     )
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
-    bot.edit_message_text("Channel Management", 
-                          chat_id=call.message.chat.id,
-                          message_id=call.message.message_id, 
-                          reply_markup=markup)
+    bot.edit_message_text("Channel Management", chat_id=call.message.chat.id,
+                          message_id=call.message.message_id, reply_markup=markup)
 
 def handle_admin_channel_add(bot, call):
     msg = bot.send_message(call.message.chat.id, "✏️ Send the channel link to add:")
@@ -427,10 +359,8 @@ def handle_admin_channel_remove(bot, call):
         link = channel.get("channel_link")
         markup.add(types.InlineKeyboardButton(link, callback_data=f"admin_channel_rm_{cid}"))
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin_channel"))
-    bot.edit_message_text("Select a channel to remove:", 
-                          chat_id=call.message.chat.id,
-                          message_id=call.message.message_id, 
-                          reply_markup=markup)
+    bot.edit_message_text("Select a channel to remove:", chat_id=call.message.chat.id,
+                          message_id=call.message.message_id, reply_markup=markup)
 
 def handle_admin_channel_rm(bot, call, channel_id):
     remove_channel(channel_id)
@@ -448,10 +378,8 @@ def handle_admin_manage(bot, call):
         types.InlineKeyboardButton("➕ Add Admin", callback_data="admin_add")
     )
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
-    bot.edit_message_text("Admin Management", 
-                          chat_id=call.message.chat.id,
-                          message_id=call.message.message_id, 
-                          reply_markup=markup)
+    bot.edit_message_text("Admin Management", chat_id=call.message.chat.id,
+                          message_id=call.message.message_id, reply_markup=markup)
 
 def handle_admin_list(bot, call):
     admins = get_admins()
@@ -461,8 +389,7 @@ def handle_admin_list(bot, call):
         text = "👥 Admins:\n"
         for admin in admins:
             text += f"• UserID: {admin.get('user_id')}, Username: {admin.get('username')}, Role: {admin.get('role')}, Banned: {admin.get('banned')}\n"
-    bot.edit_message_text(text, 
-                          chat_id=call.message.chat.id,
+    bot.edit_message_text(text, chat_id=call.message.chat.id,
                           message_id=call.message.message_id)
 
 def handle_admin_ban_unban(bot, call):
@@ -471,6 +398,7 @@ def handle_admin_ban_unban(bot, call):
 
 def process_admin_ban_unban(message):
     user_id = message.text.strip()
+    from db import get_connection
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
@@ -519,6 +447,10 @@ def process_admin_add(message):
     bot_instance.send_message(message.chat.id, response)
     send_admin_menu(bot_instance, message)
 
+# -----------------------
+# USER MANAGEMENT (Admin Panel)
+# -----------------------
+
 def handle_user_management(bot, call):
     users = get_all_users()
     if not users:
@@ -534,10 +466,8 @@ def handle_user_management(bot, call):
         callback_data = f"admin_user_{uid}"
         markup.add(types.InlineKeyboardButton(btn_text, callback_data=callback_data))
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
-    bot.edit_message_text("User Management\nSelect a user to manage:", 
-                          chat_id=call.message.chat.id,
-                          message_id=call.message.message_id, 
-                          reply_markup=markup)
+    bot.edit_message_text("User Management\nSelect a user to manage:", chat_id=call.message.chat.id,
+                            message_id=call.message.message_id, reply_markup=markup)
 
 def handle_user_management_detail(bot, call, user_id):
     user = get_user(user_id)
@@ -567,9 +497,8 @@ def handle_user_management_detail(bot, call, user_id):
             message_id=call.message.message_id, 
             reply_markup=markup
         )
-    except Exception:
+    except Exception as e:
         bot.send_message(call.message.chat.id, text, reply_markup=markup)
-
 
 def handle_user_ban_action(bot, call, user_id, action):
     if action == "ban":
@@ -585,10 +514,10 @@ def handle_user_ban_action(bot, call, user_id, action):
     bot.answer_callback_query(call.id, result_text)
     handle_user_management_detail(bot, call, user_id)
 
-
 def admin_callback_handler(bot, call):
     data = call.data
-    if not is_admin(call.from_user.id):
+    # Check if the caller is admin or owner.
+    if not (str(call.from_user.id) in config.ADMINS or str(call.from_user.id) in config.OWNERS):
         bot.answer_callback_query(call.id, "Access prohibited.")
         return
 
@@ -642,4 +571,4 @@ def admin_callback_handler(bot, call):
         send_main_menu(bot, call.message)
     else:
         bot.answer_callback_query(call.id, "Unknown admin command.")
-                   
+    
