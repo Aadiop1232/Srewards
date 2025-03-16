@@ -19,6 +19,19 @@ def is_admin(user_or_id):
 # -----------------------
 # PLATFORM MANAGEMENT FUNCTIONS
 # -----------------------
+def handle_admin_platform(bot, call):
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("➕ Add Platform", callback_data="admin_platform_add"),
+        types.InlineKeyboardButton("➖ Remove Platform", callback_data="admin_platform_remove")
+    )
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
+    try:
+        bot.edit_message_text("Platform Management Options:", chat_id=call.message.chat.id, 
+                                message_id=call.message.message_id, reply_markup=markup)
+    except Exception:
+        bot.send_message(call.message.chat.id, "Platform Management Options:", reply_markup=markup)
+
 
 def add_platform(platform_name, price):
     """
