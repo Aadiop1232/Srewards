@@ -12,6 +12,14 @@ def get_connection():
     """Creates and returns a new connection to the SQLite database."""
     return sqlite3.connect(DATABASE)
 
+def is_admin(user_or_id):
+    try:
+        user_id = str(user_or_id.id)
+    except AttributeError:
+        user_id = str(user_or_id)
+    return user_id in config.OWNERS or user_id in config.ADMINS
+
+
 def init_db():
     """Initializes the database and creates tables if they do not exist."""
     conn = get_connection()
