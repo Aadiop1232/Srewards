@@ -1,4 +1,5 @@
 # handlers/rewards.py
+import sqlite3
 import telebot
 from telebot import types
 import random
@@ -36,7 +37,7 @@ def send_rewards_menu(bot, message):
 def handle_platform_selection(bot, call, platform_name):
     """Show details for a selected platform and display a Claim button if accounts are available."""
     conn = __import__('db').get_connection()
-    conn.row_factory = telebot.types.DictRow
+    conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("SELECT * FROM platforms WHERE platform_name = ?", (platform_name,))
     platform = c.fetchone()
