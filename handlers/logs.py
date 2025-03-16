@@ -1,14 +1,12 @@
-# handlers/logs.py
 import config
 
 def log_event(bot, event_type, message, user=None):
     """
-    Sends a log message to the channel defined in config.LOGS_CHANNEL.
-    If a user object is provided, include both their user ID and username.
+    Send a log message to the channel defined in config.LOGS_CHANNEL.
+    If a user object is provided, include both user ID and username (or first name if username is missing).
     """
     if user:
-        # Use username if exists, otherwise first_name.
-        uname = user.username if hasattr(user, "username") and user.username else user.first_name
+        uname = user.username if (hasattr(user, "username") and user.username) else user.first_name
         user_info = f"User ID: {user.id}, Username: {uname}"
         full_message = f"[{event_type.upper()}] {user_info} - {message}"
     else:
@@ -17,4 +15,3 @@ def log_event(bot, event_type, message, user=None):
         bot.send_message(config.LOGS_CHANNEL, full_message)
     except Exception as e:
         print(f"Error sending log event: {e}")
-        
