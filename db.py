@@ -34,7 +34,6 @@ def init_db():
         )
     ''')
     # Platforms table: stock stored as JSON text and price with a default value.
-    # Use f-string substitution here since SQLite doesn't support parameter substitution in DDL.
     c.execute(f'''
         CREATE TABLE IF NOT EXISTS platforms (
             platform_name TEXT PRIMARY KEY,
@@ -340,6 +339,25 @@ def update_stock_for_platform(platform_name, stock):
     c.close()
     conn.close()
 
+# -----------------------
+# New Function: get_all_users
+# -----------------------
+
+def get_all_users():
+    """
+    Retrieve all users from the database.
+    Returns a list of dictionaries with user details.
+    """
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM users")
+    users = c.fetchall()
+    c.close()
+    conn.close()
+    return [dict(u) for u in users]
+
 if __name__ == '__main__':
     init_db()
     print("Database initialized.")
+    
