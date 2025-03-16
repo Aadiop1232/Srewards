@@ -1,17 +1,14 @@
-# db.py
+# handlers/admin.py
 import sqlite3
-import os
-from datetime import datetime
 import json
 import config
+from datetime import datetime
+from telebot import types
+import telebot
+from db import get_user, ban_user, unban_user, get_all_users, update_user_points, get_account_claim_cost
+from handlers.logs import log_event
 
-# Global database file path (bot.db is created in the project root)
-DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bot.db")
-
-def get_connection():
-    """Creates and returns a new connection to the SQLite database."""
-    return sqlite3.connect(DATABASE)
-
+# Check if a user is admin or owner
 def is_admin(user_or_id):
     try:
         user_id = str(user_or_id.id)
@@ -19,345 +16,156 @@ def is_admin(user_or_id):
         user_id = str(user_or_id)
     return user_id in config.OWNERS or user_id in config.ADMINS
 
+# -----------------------
+# PLATFORM MANAGEMENT FUNCTIONS
+# -----------------------
 
-def init_db():
-    """Initializes the database and creates tables if they do not exist."""
-    conn = get_connection()
+def add_platform(platform_name, price):
+    """
+    Add a new platform with a custom price.
+    """
+    conn = __import__('db').get_connection()
     c = conn.cursor()
-    
-    # Users table: stores user information.
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            telegram_id TEXT PRIMARY KEY,
-            username TEXT,
-            join_date TEXT,
-            points INTEGER DEFAULT 20,
-            referrals INTEGER DEFAULT 0,
-            banned INTEGER DEFAULT 0,
-            pending_referrer TEXT
-        )
-    ''')
-    
-    # Referrals table: stores referral relationships between users.
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS referrals (
-            user_id TEXT,
-            referred_id TEXT,
-            PRIMARY KEY (user_id, referred_id)
-        )
-    ''')
-    
-    # Platforms table: stores platform name, stock (as JSON), and price per account.
-    c.execute(f'''
-        CREATE TABLE IF NOT EXISTS platforms (
-            platform_name TEXT PRIMARY KEY,
-            stock TEXT,
-            price INTEGER DEFAULT {config.DEFAULT_ACCOUNT_CLAIM_COST}
-        )
-    ''')
-    
-    # Reviews table: stores user reviews.
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS reviews (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT,
-            review TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Admin logs table: stores logs of admin actions.
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS admin_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            admin_id TEXT,
-            action TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Channels table: stores channel links.
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS channels (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            channel_link TEXT
-        )
-    ''')
-    
-    # Admins table: stores admin information.
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS admins (
-            user_id TEXT PRIMARY KEY,
-            username TEXT,
-            role TEXT,
-            banned INTEGER DEFAULT 0
-        )
-    ''')
-    
-    # Keys table: stores reward keys.
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS keys (
-            key TEXT PRIMARY KEY,
-            type TEXT,
-            points INTEGER,
-            claimed INTEGER DEFAULT 0,
-            claimed_by TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Configurations table: stores dynamic configuration values.
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS configurations (
-            config_key TEXT PRIMARY KEY,
-            config_value TEXT
-        )
-    ''')
-    
+    c.execute("SELECT * FROM platforms WHERE platform_name = ?", (platform_name,))
+    if c.fetchone():
+        c.close()
+        conn.close()
+        return f"Platform '{platform_name}' already exists."
+    c.execute("INSERT INTO platforms (platform_name, stock, price) VALUES (?, ?, ?)", 
+              (platform_name, "[]", price))
     conn.commit()
     c.close()
     conn.close()
-    print("Database initialized.")
+    log_event(telebot.TeleBot(config.TOKEN), "platform", f"Platform '{platform_name}' added with price {price} points.")
+    return None
 
-# -----------------------
-# Dynamic Configuration Functions
-# -----------------------
-
-def set_config_value(key, value):
-    """Sets or updates a configuration value."""
-    conn = get_connection()
+def remove_platform(platform_name):
+    conn = __import__('db').get_connection()
     c = conn.cursor()
-    c.execute("REPLACE INTO configurations (config_key, config_value) VALUES (?, ?)", (key, str(value)))
+    c.execute("DELETE FROM platforms WHERE platform_name = ?", (platform_name,))
     conn.commit()
     c.close()
     conn.close()
+    log_event(telebot.TeleBot(config.TOKEN), "platform", f"Platform '{platform_name}' removed.")
 
-def get_config_value(key):
-    """Retrieves a configuration value by key."""
-    conn = get_connection()
+def get_platforms():
+    conn = __import__('db').get_connection()
+    conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT config_value FROM configurations WHERE config_key = ?", (key,))
+    c.execute("SELECT * FROM platforms")
+    platforms = c.fetchall()
+    c.close()
+    conn.close()
+    return [dict(p) for p in platforms]
+
+def add_stock_to_platform(platform_name, accounts):
+    conn = __import__('db').get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT stock FROM platforms WHERE platform_name = ?", (platform_name,))
     row = c.fetchone()
+    current_stock = json.loads(row["stock"]) if row and row["stock"] else []
+    new_stock = current_stock + accounts
+    c.execute("UPDATE platforms SET stock = ? WHERE platform_name = ?", (json.dumps(new_stock), platform_name))
+    conn.commit()
     c.close()
     conn.close()
-    return row[0] if row else None
+    log_event(telebot.TeleBot(config.TOKEN), "stock", f"Added {len(accounts)} accounts to platform '{platform_name}'.")
+    return f"Stock updated with {len(accounts)} accounts."
 
-def set_account_claim_cost(cost):
-    set_config_value("account_claim_cost", cost)
-
-def get_account_claim_cost():
-    cost = get_config_value("account_claim_cost")
-    return int(cost) if cost is not None else config.DEFAULT_ACCOUNT_CLAIM_COST
-
-def set_referral_bonus(bonus):
-    set_config_value("referral_bonus", bonus)
-
-def get_referral_bonus():
-    bonus = get_config_value("referral_bonus")
-    return int(bonus) if bonus is not None else config.DEFAULT_REFERRAL_BONUS
-
-# -----------------------
-# User Functions
-# -----------------------
-
-def add_user(telegram_id, username, join_date, pending_referrer=None):
-    conn = get_connection()
+def update_stock_for_platform(platform_name, stock):
+    conn = __import__('db').get_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE telegram_id = ?", (telegram_id,))
-    user = c.fetchone()
-    if not user:
-        c.execute("""
-            INSERT INTO users (telegram_id, username, join_date, pending_referrer)
-            VALUES (?, ?, ?, ?)
-        """, (telegram_id, username, join_date, pending_referrer))
-        conn.commit()
+    c.execute("UPDATE platforms SET stock = ? WHERE platform_name = ?", (json.dumps(stock), platform_name))
+    conn.commit()
     c.close()
     conn.close()
-    return get_user(telegram_id)
+    log_event(telebot.TeleBot(config.TOKEN), "stock", f"Platform '{platform_name}' stock updated to {len(stock)} accounts.")
 
-def get_user(telegram_id):
-    conn = get_connection()
+# -----------------------
+# CHANNEL MANAGEMENT FUNCTIONS
+# -----------------------
+
+def add_channel(channel_link):
+    conn = __import__('db').get_connection()
+    c = conn.cursor()
+    c.execute("INSERT INTO channels (channel_link) VALUES (?)", (channel_link,))
+    conn.commit()
+    c.close()
+    conn.close()
+    log_event(telebot.TeleBot(config.TOKEN), "channel", f"Channel '{channel_link}' added.")
+
+def remove_channel(channel_id):
+    conn = __import__('db').get_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM channels WHERE id = ?", (channel_id,))
+    conn.commit()
+    c.close()
+    conn.close()
+    log_event(telebot.TeleBot(config.TOKEN), "channel", f"Channel with ID '{channel_id}' removed.")
+
+def get_channels():
+    conn = __import__('db').get_connection()
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE telegram_id = ?", (telegram_id,))
-    user = c.fetchone()
+    c.execute("SELECT * FROM channels")
+    channels = c.fetchall()
     c.close()
     conn.close()
-    return dict(user) if user else None
-
-def update_user_points(telegram_id, new_points):
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("UPDATE users SET points = ? WHERE telegram_id = ?", (new_points, telegram_id))
-    conn.commit()
-    c.close()
-    conn.close()
-
-def ban_user(telegram_id):
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("UPDATE users SET banned = 1 WHERE telegram_id = ?", (telegram_id,))
-    conn.commit()
-    c.close()
-    conn.close()
-
-def unban_user(telegram_id):
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("UPDATE users SET banned = 0 WHERE telegram_id = ?", (telegram_id,))
-    conn.commit()
-    c.close()
-    conn.close()
+    return [dict(ch) for ch in channels]
 
 # -----------------------
-# Referral Functions
+# ADMINS MANAGEMENT FUNCTIONS
 # -----------------------
 
-def add_referral(referrer_id, referred_id):
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM referrals WHERE referred_id = ?", (referred_id,))
-    if not c.fetchone():
-        c.execute("INSERT INTO referrals (user_id, referred_id) VALUES (?, ?)", (referrer_id, referred_id))
-        conn.commit()
-        bonus = get_referral_bonus()
-        c.execute("UPDATE users SET points = points + ?, referrals = referrals + 1 WHERE telegram_id = ?", (bonus, referrer_id))
-        conn.commit()
-    c.close()
-    conn.close()
-
-def clear_pending_referral(telegram_id):
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("UPDATE users SET pending_referrer = NULL WHERE telegram_id = ?", (telegram_id,))
-    conn.commit()
-    c.close()
-    conn.close()
-
-# -----------------------
-# Review Functions
-# -----------------------
-
-def add_review(user_id, review_text):
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("INSERT INTO reviews (user_id, review, timestamp) VALUES (?, ?, ?)", (user_id, review_text, datetime.now()))
-    conn.commit()
-    c.close()
-    conn.close()
-
-# -----------------------
-# Admin Logs Functions
-# -----------------------
-
-def log_admin_action(admin_id, action):
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("INSERT INTO admin_logs (admin_id, action, timestamp) VALUES (?, ?, ?)", (admin_id, action, datetime.now()))
-    conn.commit()
-    c.close()
-    conn.close()
-
-# -----------------------
-# Key Functions
-# -----------------------
-
-def get_key(key_str):
-    conn = get_connection()
+def get_admins():
+    conn = __import__('db').get_connection()
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT * FROM keys WHERE key = ?", (key_str,))
-    key_doc = c.fetchone()
+    c.execute("SELECT * FROM admins")
+    admins = c.fetchall()
     c.close()
     conn.close()
-    return dict(key_doc) if key_doc else None
+    return [dict(a) for a in admins]
 
-def claim_key_in_db(key_str, telegram_id):
-    conn = get_connection()
-    conn.row_factory = sqlite3.Row
+def add_admin(user_id, username, role="admin"):
+    conn = __import__('db').get_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM keys WHERE key = ?", (key_str,))
-    key_doc = c.fetchone()
-    if not key_doc:
-        c.close()
-        conn.close()
-        return "Key not found."
-    if key_doc["claimed"]:
-        c.close()
-        conn.close()
-        return "Key already claimed."
-    points_awarded = key_doc["points"]
-    c.execute("UPDATE keys SET claimed = 1, claimed_by = ?, timestamp = ? WHERE key = ?",
-              (telegram_id, datetime.now(), key_str))
-    conn.commit()
-    c.execute("UPDATE users SET points = points + ? WHERE telegram_id = ?", (points_awarded, telegram_id))
+    c.execute("REPLACE INTO admins (user_id, username, role, banned) VALUES (?, ?, ?, 0)", (user_id, username, role))
     conn.commit()
     c.close()
     conn.close()
-    return f"Key redeemed successfully. You've been awarded {points_awarded} points."
+    log_event(telebot.TeleBot(config.TOKEN), "admin", f"Admin '{user_id}' ({username}) added with role '{role}'.")
 
-def add_key(key_str, key_type, points):
-    conn = get_connection()
+def remove_admin(user_id):
+    conn = __import__('db').get_connection()
     c = conn.cursor()
-    c.execute("INSERT INTO keys (key, type, points, claimed, claimed_by, timestamp) VALUES (?, ?, ?, 0, NULL, ?)",
-              (key_str, key_type, points, datetime.now()))
+    c.execute("DELETE FROM admins WHERE user_id = ?", (user_id,))
     conn.commit()
     c.close()
     conn.close()
+    log_event(telebot.TeleBot(config.TOKEN), "admin", f"Admin '{user_id}' removed.")
 
-def get_keys():
-    conn = get_connection()
-    conn.row_factory = sqlite3.Row
+def ban_admin(user_id):
+    conn = __import__('db').get_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM keys")
-    keys = c.fetchall()
+    c.execute("UPDATE admins SET banned = 1 WHERE user_id = ?", (user_id,))
+    conn.commit()
     c.close()
     conn.close()
-    return [dict(k) for k in keys]
+    log_event(telebot.TeleBot(config.TOKEN), "admin", f"Admin '{user_id}' banned.")
 
-# -----------------------
-# Additional Functions
-# -----------------------
-
-def get_leaderboard(limit=10):
-    conn = get_connection()
-    conn.row_factory = sqlite3.Row
+def unban_admin(user_id):
+    conn = __import__('db').get_connection()
     c = conn.cursor()
-    c.execute("SELECT telegram_id, username, points FROM users ORDER BY points DESC LIMIT ?", (limit,))
-    leaderboard = c.fetchall()
+    c.execute("UPDATE admins SET banned = 0 WHERE user_id = ?", (user_id,))
+    conn.commit()
     c.close()
     conn.close()
-    return [dict(row) for row in leaderboard]
-
-def get_admin_dashboard():
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM users")
-    total_users = c.fetchone()[0]
-    c.execute("SELECT COUNT(*) FROM users WHERE banned = 1")
-    banned_users = c.fetchone()[0]
-    c.execute("SELECT SUM(points) FROM users")
-    total_points = c.fetchone()[0] or 0
-    c.close()
-    conn.close()
-    return total_users, banned_users, total_points
+    log_event(telebot.TeleBot(config.TOKEN), "admin", f"Admin '{user_id}' unbanned.")
 
 # -----------------------
-# USER MANAGEMENT (for Admin Panel)
-# -----------------------
-
-def get_all_users():
-    conn = get_connection()
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute("SELECT * FROM users")
-    users = c.fetchall()
-    c.close()
-    conn.close()
-    return [dict(u) for u in users]
-
-# -----------------------
-# ADMIN KEYS
+# KEY FUNCTIONS
 # -----------------------
 
 def generate_normal_key():
@@ -367,6 +175,16 @@ def generate_normal_key():
 def generate_premium_key():
     import random, string
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
+
+def add_key(key_str, key_type, points):
+    from db import get_connection
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("INSERT INTO keys (key, type, points, claimed, claimed_by, timestamp) VALUES (?, ?, ?, 0, NULL, ?)",
+              (key_str, key_type, points, datetime.now()))
+    conn.commit()
+    c.close()
+    conn.close()
 
 # -----------------------
 # LENDING POINTS
@@ -378,7 +196,7 @@ def lend_points(admin_id, user_id, points, custom_message=None):
         return f"User '{user_id}' not found."
     new_balance = user["points"] + points
     update_user_points(user_id, new_balance)
-    log_admin_action(admin_id, f"Lent {points} points to user {user_id}.")
+    log_event(telebot.TeleBot(config.TOKEN), "lend", f"Admin {admin_id} lent {points} points to user {user_id}.")
     bot_instance = telebot.TeleBot(config.TOKEN)
     if custom_message:
         msg = custom_message
@@ -397,12 +215,27 @@ def lend_points(admin_id, user_id, points, custom_message=None):
 def update_account_claim_cost(cost):
     from db import set_config_value
     set_config_value("account_claim_cost", cost)
-    log_admin_action("system", f"Account claim cost updated to {cost} points.")
+    log_event(telebot.TeleBot(config.TOKEN), "config", f"Account claim cost updated to {cost} points.")
 
 def update_referral_bonus(bonus):
     from db import set_config_value
     set_config_value("referral_bonus", bonus)
-    log_admin_action("system", f"Referral bonus updated to {bonus} points.")
+    log_event(telebot.TeleBot(config.TOKEN), "config", f"Referral bonus updated to {bonus} points.")
+
+# -----------------------
+# USER MANAGEMENT (for Admin Panel)
+# -----------------------
+
+def get_all_users():
+    from db import get_connection
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM users")
+    users = c.fetchall()
+    c.close()
+    conn.close()
+    return [dict(u) for u in users]
 
 # -----------------------
 # ADMIN PANEL CALLBACK ROUTER AND HANDLERS
@@ -434,17 +267,7 @@ def send_admin_menu(bot, update):
     except Exception:
         bot.send_message(chat_id, "ðŸ›  Admin Panel", reply_markup=markup)
 
-def handle_admin_platform(bot, call):
-    platforms = get_platforms()
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        types.InlineKeyboardButton("âž• Add Platform", callback_data="admin_platform_add"),
-        types.InlineKeyboardButton("âž– Remove Platform", callback_data="admin_platform_remove")
-    )
-    markup.add(types.InlineKeyboardButton("ðŸ”™ Back", callback_data="back_main"))
-    bot.edit_message_text("Platform Management", chat_id=call.message.chat.id,
-                          message_id=call.message.message_id, reply_markup=markup)
-
+# New flow: When adding a platform, ask for platform name then for price.
 def handle_admin_platform_add(bot, call):
     msg = bot.send_message(call.message.chat.id, "âœï¸ Send the platform name to add:")
     bot.register_next_step_handler(msg, process_platform_add)
@@ -768,4 +591,3 @@ def admin_callback_handler(bot, call):
         send_main_menu(bot, call.message)
     else:
         bot.answer_callback_query(call.id, "Unknown admin command.")
-       
