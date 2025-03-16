@@ -239,6 +239,17 @@ def log_admin_action(admin_id, action):
     c.close()
     conn.close()
 
+def get_admins():
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM admins")
+    admins = c.fetchall()
+    c.close()
+    conn.close()
+    return [dict(a) for a in admins]
+
+
 # -----------------------
 # Key Functions
 # -----------------------
