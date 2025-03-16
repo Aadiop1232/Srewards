@@ -81,7 +81,7 @@ def gen_command(message):
         bot.reply_to(message, "Key type must be either 'normal' or 'premium'.")
         return
     if generated:
-        text = f"Redeem Generated ✅➔ `<code>{generated[0]}</code>`\n"
+        text = f"Redeem Generated ✅ ➔ `{generated[0]}`\n"
         for key in generated[1:]:
             text += f"➔ `<code>{key}</code>`\n"
         text += "\nYou can redeem these codes using: /redeem <Key>"
