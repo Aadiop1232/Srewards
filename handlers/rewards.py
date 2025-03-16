@@ -76,7 +76,7 @@ def claim_account(bot, call, platform_name):
         return
     # Retrieve platform data
     conn = __import__('db').get_connection()
-    conn.row_factory = telebot.types.DictRow
+    conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("SELECT * FROM platforms WHERE platform_name = ?", (platform_name,))
     platform = c.fetchone()
