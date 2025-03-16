@@ -28,7 +28,7 @@ def send_rewards_menu(bot, message):
 
 def handle_platform_selection(bot, call, platform_name):
     conn = __import__('db').get_connection()
-    conn.row_factory = sqlite3.Row
+    conn.row_factory = telebot.types.DictRow
     c = conn.cursor()
     c.execute("SELECT * FROM platforms WHERE platform_name = ?", (platform_name,))
     platform = c.fetchone()
@@ -60,7 +60,7 @@ def claim_account(bot, call, platform_name):
         bot.send_message(call.message.chat.id, "User not found. Please /start the bot first.")
         return
     conn = __import__('db').get_connection()
-    conn.row_factory = sqlite3.Row
+    conn.row_factory = telebot.types.DictRow
     c = conn.cursor()
     c.execute("SELECT * FROM platforms WHERE platform_name = ?", (platform_name,))
     platform = c.fetchone()
@@ -89,4 +89,10 @@ def claim_account(bot, call, platform_name):
     new_points = current_points - price
     update_user_points(user_id, new_points)
     log_event(bot, "account_claim", f"User {user_id} claimed an account from {platform_name}. Account: {account}. New balance: {new_points} pts.")
-    bot.send_message(call.message.chat.id, f"🎉 Account claimed!\nYour account for {platform_name}:\n<code>{account}</code>\nRemaining points: {new_points}", parse_mode="HTML")
+    
+    # Send account details with an inline "Report" button
+    account_message = f"🎉 Account claimed!\nYour account for {platform_name}:\n<code>{account}</code>\nRemaining points: {new_points}"
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("Report", callback_data="report_account"))
+    bot.send_message(call.message.chat.id, account_message, parse_mode="HTML", reply_markup=markup)
+    
