@@ -28,7 +28,7 @@ def start_command(message):
             pending_referrer=pending_ref
         )
         user = get_user(user_id)
-    # Process referral if pending
+    # Process referral if present
     if pending_ref:
         process_verified_referral(user_id, bot)
     if is_admin(message.from_user):
@@ -89,6 +89,7 @@ def tutorial_command(message):
     )
     bot.send_message(message.chat.id, text, parse_mode="HTML")
 
+# Callback handler for "Back" – ensures that the full call object is passed so admin info is preserved.
 @bot.callback_query_handler(func=lambda call: call.data == "back_main")
 def callback_back_main(call):
     try:
@@ -96,9 +97,7 @@ def callback_back_main(call):
     except Exception as e:
         print("Error deleting message:", e)
     from handlers.main_menu import send_main_menu
-    # Pass the full call so that call.from_user is used in send_main_menu
     send_main_menu(bot, call)
-
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("verify"))
 def callback_verify(call):
@@ -134,14 +133,24 @@ def callback_menu(call):
     else:
         bot.answer_callback_query(call.id, "Unknown menu command.")
 
+# New callback for generating referral link.
+@bot.callback_query_handler(func=lambda call: call.data == "get_ref_link")
+def callback_get_ref_link(call):
+    from handlers.referral import get_referral_link
+    referral_link = get_referral_link(call.from_user.id)
+    bot.answer_callback_query(call.id, "Referral link generated!")
+    bot.send_message(call.message.chat.id, f"Your referral link:\n{referral_link}")
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith("reward_"))
 def callback_reward(call):
     platform_name = call.data.split("reward_")[1]
+    from handlers.rewards import handle_platform_selection
     handle_platform_selection(bot, call, platform_name)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("claim_"))
 def callback_claim(call):
     platform_name = call.data.split("claim_")[1]
+    from handlers.rewards import claim_account
     claim_account(bot, call, platform_name)
 
 while True:
