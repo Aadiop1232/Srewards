@@ -83,7 +83,7 @@ def gen_command(message):
     if generated:
         text = f"Redeem Generated ✅ ➔ `{generated[0]}`\n"
         for key in generated[1:]:
-            text += f"➔ `<code>{key}</code>`\n"
+            text += f"➔ `{key}`\n"
         text += "\nYou can redeem these codes using: /redeem <Key>"
     else:
         text = "No keys generated."
