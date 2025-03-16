@@ -19,9 +19,6 @@ def start_command(message):
     print(f"[DEBUG] /start received from user: {message.from_user.id}")
     user_id = str(message.from_user.id)
     user = get_user(user_id)
-    if user and user.get("banned", 0):
-        bot.send_message(message.chat.id, "🚫 You are banned and cannot use this bot.")
-        return
     pending_ref = extract_referral_code(message)
     if not user:
         add_user(
@@ -31,6 +28,9 @@ def start_command(message):
             pending_referrer=pending_ref
         )
         user = get_user(user_id)
+    # Process referral if pending
+    if pending_ref:
+        process_verified_referral(user_id, bot)
     if is_admin(message.from_user):
         bot.send_message(message.chat.id, "✨ Welcome, Admin/Owner! You are automatically verified! ✨")
         send_main_menu(bot, message)
@@ -45,7 +45,6 @@ def lend_command(message):
         return
     parts = message.text.strip().split()
     if len(parts) < 3:
-        # Escape angle brackets so HTML parse mode doesn't interpret them as tags.
         bot.reply_to(message, "Usage: /lend &lt;user_id&gt; &lt;points&gt; [custom message]", parse_mode="HTML")
         return
     user_id = parts[1]
@@ -97,8 +96,7 @@ def callback_back_main(call):
     except Exception as e:
         print("Error deleting message:", e)
     from handlers.main_menu import send_main_menu
-    # Pass the call object to preserve call.from_user for admin check
-    send_main_menu(bot, call)
+    send_main_menu(bot, call)  # Pass the full call object
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("verify"))
 def callback_verify(call):
@@ -130,7 +128,7 @@ def callback_menu(call):
         send_support_message(bot, call.message)
     elif call.data == "menu_admin":
         from handlers.admin import send_admin_menu
-        send_admin_menu(bot, call.message)
+        send_admin_menu(bot, call)
     else:
         bot.answer_callback_query(call.id, "Unknown menu command.")
 
@@ -144,7 +142,6 @@ def callback_claim(call):
     platform_name = call.data.split("claim_")[1]
     claim_account(bot, call, platform_name)
 
-# Resilient polling loop for 24/7 uptime.
 while True:
     try:
         bot.polling(none_stop=True)
@@ -156,4 +153,3 @@ while True:
             pass
         import time
         time.sleep(15)
-    
