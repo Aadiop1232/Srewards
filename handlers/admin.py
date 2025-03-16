@@ -1,24 +1,31 @@
-# handlers/admin.py
 import sqlite3
 import json
 import config
 from datetime import datetime
 from telebot import types
 import telebot
-from db import get_user, ban_user, unban_user, update_user_points, get_account_claim_cost
+from db import get_user, ban_user, unban_user, update_user_points, get_account_claim_cost, get_admins
 from handlers.logs import log_event
 
 def is_admin(user_or_id):
+    """
+    Check if the given user (or user id) is an admin.
+    If a dictionary is passed (from the DB), use its "telegram_id" field.
+    Otherwise, check the user object's id.
+    This function now also checks the admins table in the DB.
+    """
     try:
-        # If passed a dictionary (e.g. from get_user), use its "telegram_id" field.
+        # If it's a dictionary (from the DB record)
         if isinstance(user_or_id, dict):
             user_id = str(user_or_id.get("telegram_id"))
         else:
             user_id = str(user_or_id.id)
     except AttributeError:
         user_id = str(user_or_id)
-    return user_id in config.OWNERS or user_id in config.ADMINS
-
+    # Check against owners (from config) and against admins stored in the DB.
+    db_admins = get_admins()
+    db_admin_ids = [admin.get("user_id") for admin in db_admins]
+    return user_id in config.OWNERS or user_id in db_admin_ids
 
 # -----------------------
 # PLATFORM MANAGEMENT FUNCTIONS
@@ -140,6 +147,12 @@ def add_admin(user_id, username, role="admin"):
     c.close()
     conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "admin", f"Admin '{user_id}' ({username}) added with role '{role}'.")
+    # Notify the new admin:
+    try:
+        bot_instance = telebot.TeleBot(config.TOKEN)
+        bot_instance.send_message(user_id, f"Congratulations, you have been added as an admin.")
+    except Exception as e:
+        print(f"Error notifying new admin {user_id}: {e}")
 
 def remove_admin(user_id):
     conn = __import__('db').get_connection()
@@ -169,19 +182,18 @@ def unban_admin(user_id):
     log_event(telebot.TeleBot(config.TOKEN), "admin", f"Admin '{user_id}' unbanned.")
 
 # -----------------------
-# KEY FUNCTIONS
+# KEY FUNCTIONS (Key Generation)
 # -----------------------
 
 def generate_normal_key():
     import random, string
-    # Generate 10 random alphanumeric characters and prepend "NKEY-"
+    # Normal key: NKEY- + 10 random alphanumeric characters.
     return "NKEY-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
 
 def generate_premium_key():
     import random, string
-    # Generate 10 random alphanumeric characters and prepend "PKEY-"
+    # Premium key: PKEY- + 10 random alphanumeric characters.
     return "PKEY-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
-
 
 def add_key(key_str, key_type, points):
     from db import get_connection
@@ -246,15 +258,20 @@ def get_all_users():
 # -----------------------
 
 def send_admin_menu(bot, update):
-    if isinstance(update, telebot.types.Message):
-        chat_id = update.chat.id
-        message_id = update.message_id
-    elif isinstance(update, telebot.types.CallbackQuery):
+    # Try to extract chat_id and user from either a Message or CallbackQuery.
+    if hasattr(update, "message") and update.message:
         chat_id = update.message.chat.id
+        user = update.message.from_user
         message_id = update.message.message_id
+    elif hasattr(update, "from_user") and update.from_user:
+        # For CallbackQuery objects.
+        chat_id = update.message.chat.id if hasattr(update, "message") and update.message else update.chat.id
+        user = update.from_user
+        message_id = update.message.message_id if hasattr(update, "message") and update.message else None
     else:
         chat_id = update.chat.id
-        message_id = update.message_id
+        user = update.from_user
+        message_id = None
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
@@ -267,14 +284,16 @@ def send_admin_menu(bot, update):
     )
     markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
     try:
-        bot.edit_message_text("🛠 Admin Panel", chat_id=chat_id, message_id=message_id, reply_markup=markup)
+        if message_id:
+            bot.edit_message_text("🛠 Admin Panel", chat_id=chat_id, message_id=message_id, reply_markup=markup)
+        else:
+            bot.send_message(chat_id, "🛠 Admin Panel", reply_markup=markup)
     except Exception:
         bot.send_message(chat_id, "🛠 Admin Panel", reply_markup=markup)
 
 # ----- PLATFORM MANAGEMENT HANDLERS -----
 
 def handle_admin_platform(bot, call):
-    # This function displays options for platform management.
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton("➕ Add Platform", callback_data="admin_platform_add"),
@@ -326,7 +345,7 @@ def handle_admin_platform_remove(bot, call):
 def handle_admin_platform_rm(bot, call, platform_name):
     remove_platform(platform_name)
     bot.answer_callback_query(call.id, f"Platform '{platform_name}' removed.")
-    handle_admin_platform(bot, call)  # Show platform options again
+    handle_admin_platform(bot, call)
 
 def handle_admin_stock(bot, call):
     platforms = get_platforms()
@@ -345,7 +364,6 @@ def handle_admin_stock_platform(bot, call, platform_name):
     msg = bot.send_message(call.message.chat.id, f"Please send the stock text for platform '{platform_name}' (attach file or type text):")
     bot.register_next_step_handler(msg, lambda m: process_stock_upload_admin(bot, m, platform_name))
 
-
 def process_stock_upload_admin(bot, message, platform_name, retries=3):
     if message.content_type == "document":
         for attempt in range(retries):
@@ -356,10 +374,9 @@ def process_stock_upload_admin(bot, message, platform_name, retries=3):
                     data = downloaded_file.decode('utf-8')
                 except UnicodeDecodeError:
                     data = downloaded_file.decode('latin-1', errors='replace')
-                break  # Success, exit the retry loop.
+                break
             except Exception as e:
                 if attempt < retries - 1:
-                    # Optionally wait before retrying
                     import time
                     time.sleep(2)
                     continue
@@ -368,8 +385,6 @@ def process_stock_upload_admin(bot, message, platform_name, retries=3):
                     return
     else:
         data = message.text.strip()
-
-    # Process the data as before...
     if "\n\n" in data:
         accounts = [block.strip() for block in data.split("\n\n") if block.strip()]
     else:
@@ -377,9 +392,6 @@ def process_stock_upload_admin(bot, message, platform_name, retries=3):
     update_stock_for_platform(platform_name, accounts)
     bot.send_message(message.chat.id, f"Stock for '{platform_name}' updated with {len(accounts)} accounts.")
     send_admin_menu(bot, message)
-    
-        
-            
 
 # ----- CHANNEL MANAGEMENT HANDLERS -----
 
@@ -555,11 +567,11 @@ def handle_user_ban_action(bot, call, user_id, action):
     if action == "ban":
         ban_user(user_id)
         result_text = f"User {user_id} has been banned."
-        log_event(bot, "ban", f"User {user_id} banned by admin {call.from_user.id}.")
+        log_event(bot, "ban", f"User {user_id} banned by admin {call.from_user.id}.", user=call.from_user)
     elif action == "unban":
         unban_user(user_id)
         result_text = f"User {user_id} has been unbanned."
-        log_event(bot, "unban", f"User {user_id} unbanned by admin {call.from_user.id}.")
+        log_event(bot, "unban", f"User {user_id} unbanned by admin {call.from_user.id}.", user=call.from_user)
     else:
         result_text = "Invalid action."
     bot.answer_callback_query(call.id, result_text)
@@ -567,10 +579,9 @@ def handle_user_ban_action(bot, call, user_id, action):
 
 def admin_callback_handler(bot, call):
     data = call.data
-    if not (str(call.from_user.id) in config.ADMINS or str(call.from_user.id) in config.OWNERS):
+    if not (str(call.from_user.id) in config.OWNERS or is_admin(call.from_user)):
         bot.answer_callback_query(call.id, "Access prohibited.")
         return
-
     if data == "admin_platform":
         handle_admin_platform(bot, call)
     elif data == "admin_platform_add":
@@ -616,6 +627,6 @@ def admin_callback_handler(bot, call):
         handle_user_ban_action(bot, call, user_id, action)
     elif data == "back_main":
         from handlers.main_menu import send_main_menu
-        send_main_menu(bot, call.message)
+        send_main_menu(bot, call)
     else:
         bot.answer_callback_query(call.id, "Unknown admin command.")
