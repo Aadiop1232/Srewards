@@ -336,7 +336,8 @@ def handle_admin_stock(bot, call):
 
 def handle_admin_stock_platform(bot, call, platform_name):
     msg = bot.send_message(call.message.chat.id, f"Please send the stock text for platform '{platform_name}' (attach file or type text):")
-    bot.register_next_step_handler(msg, lambda m: process_stock_upload_admin(m, platform_name))
+    bot.register_next_step_handler(msg, lambda m: process_stock_upload_admin(bot, m, platform_name))
+
 
 def process_stock_upload_admin(bot, message, platform_name):
     if message.content_type == "document":
