@@ -359,6 +359,7 @@ def process_stock_upload_admin(bot, message, platform_name):
     update_stock_for_platform(platform_name, accounts)
     bot.send_message(message.chat.id, f"Stock for '{platform_name}' updated with {len(accounts)} accounts.")
     send_admin_menu(bot, message)
+        
             
 
 # ----- CHANNEL MANAGEMENT HANDLERS -----
