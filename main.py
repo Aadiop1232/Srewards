@@ -30,7 +30,7 @@ def start_command(message):
             pending_referrer=pending_ref
         )
         user = get_user(user_id)
-    # Process referral if a pending_referrer exists in the user's record
+    # Process referral if pending_referrer exists in the user's record
     if user.get("pending_referrer"):
         process_verified_referral(user_id, bot)
     if is_admin(message.from_user):
@@ -93,6 +93,7 @@ def tutorial_command(message):
 
 @bot.message_handler(commands=["gen"])
 def gen_command(message):
+    # Only allow admins/owners to generate keys
     if str(message.from_user.id) not in config.ADMINS and str(message.from_user.id) not in config.OWNERS:
         bot.reply_to(message, "🚫 You don't have permission to generate keys.")
         return
@@ -109,12 +110,12 @@ def gen_command(message):
     generated = []
     if key_type == "normal":
         for _ in range(qty):
-            key = generate_normal_key()
+            key = generate_normal_key()  # Format: NKEY-XXXXXXXXXX
             add_key(key, "normal", 15)
             generated.append(key)
     elif key_type == "premium":
         for _ in range(qty):
-            key = generate_premium_key()
+            key = generate_premium_key()  # Format: PKEY-XXXXXXXXXX
             add_key(key, "premium", 90)
             generated.append(key)
     else:
@@ -136,7 +137,7 @@ def callback_back_main(call):
     except Exception as e:
         print("Error deleting message:", e)
     from handlers.main_menu import send_main_menu
-    send_main_menu(bot, call)  # Pass the full call object to preserve call.from_user
+    send_main_menu(bot, call)  # Pass full call to preserve admin info
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("verify"))
 def callback_verify(call):
