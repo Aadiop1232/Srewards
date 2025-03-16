@@ -364,6 +364,14 @@ def get_platforms_db():
     conn.close()
     return [dict(p) for p in platforms]
 
+def update_stock_for_platform(platform_name, stock):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE platforms SET stock = ? WHERE platform_name = ?", (json.dumps(stock), platform_name))
+    conn.commit()
+    c.close()
+    conn.close()
+
 # For compatibility with other modules.
 get_platforms = get_platforms_db
 
