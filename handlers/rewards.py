@@ -6,6 +6,7 @@ import config
 from db import get_user, update_user_points, get_account_claim_cost, get_platforms
 from handlers.logs import log_event
 import json
+import sqlite3
 
 def send_rewards_menu(bot, message):
     platforms = get_platforms()
@@ -21,14 +22,17 @@ def send_rewards_menu(bot, message):
         markup.add(types.InlineKeyboardButton(btn_text, callback_data=f"reward_{platform_name}"))
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
     try:
-        bot.edit_message_text("<b>🎯 Available Platforms 🎯</b>", chat_id=message.chat.id,
-                              message_id=message.message_id, parse_mode="HTML", reply_markup=markup)
+        bot.edit_message_text("<b>🎯 Available Platforms 🎯</b>", 
+                              chat_id=message.chat.id,
+                              message_id=message.message_id, 
+                              parse_mode="HTML", reply_markup=markup)
     except Exception:
-        bot.send_message(message.chat.id, "<b>🎯 Available Platforms 🎯</b>", parse_mode="HTML", reply_markup=markup)
+        bot.send_message(message.chat.id, "<b>🎯 Available Platforms 🎯</b>", 
+                         parse_mode="HTML", reply_markup=markup)
 
 def handle_platform_selection(bot, call, platform_name):
     conn = __import__('db').get_connection()
-    conn.row_factory = __import__('sqlite3').Row
+    conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("SELECT * FROM platforms WHERE platform_name = ?", (platform_name,))
     platform = c.fetchone()
@@ -48,10 +52,29 @@ def handle_platform_selection(bot, call, platform_name):
         markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="menu_rewards"))
     try:
-        bot.edit_message_text(text, chat_id=call.message.chat.id,
-                              message_id=call.message.message_id, parse_mode="HTML", reply_markup=markup)
+        bot.edit_message_text(text, 
+                              chat_id=call.message.chat.id,
+                              message_id=call.message.message_id, 
+                              parse_mode="HTML", reply_markup=markup)
     except Exception:
         bot.send_message(call.message.chat.id, text, parse_mode="HTML", reply_markup=markup)
+
+def send_premium_account_info(bot, chat_id, platform_name, account_info):
+    text = f"""🎉✨ 𝗣𝗥𝗘𝗠𝗜𝗨𝗠 𝗔𝗖𝗖𝗢𝗨𝗡𝗧 𝗨𝗡𝗟𝗢𝗖𝗞𝗘𝗗 
+
+✨🎉📦 𝗦𝗲𝗿𝘃𝗶𝗰𝗲: {platform_name} 🔑 𝗬𝗼𝘂𝗿  
+
+𝗔𝗰𝗰𝗼𝗻𝘁: 
+<code>{account_info}</code> 📌 
+
+𝗛𝗼𝘄 𝘁𝗼 𝗹𝗼𝗴𝗶𝗻:
+1️⃣ Copy the details
+2️⃣ Open app/website
+3️⃣ Paste & login
+
+❌ 𝗔𝗰𝗰𝗼𝗻𝘁 𝗻𝗼𝘁 𝘄𝗼𝗿𝗸𝗶𝗻𝗴? 𝗥𝗲𝗽𝗼𝗿𝘁 𝗯𝗲𝗹𝗼𝘄 𝘁𝗼 𝗴𝗲𝘁 𝗮 𝗿𝗲𝗳𝘂𝗻𝗱 𝗼𝗳 𝘆𝗼𝘂𝗿 𝗽𝗼𝗶𝗻𝘁𝘀!
+By @shadowsquad0"""
+    bot.send_message(chat_id, text, parse_mode="HTML")
 
 def claim_account(bot, call, platform_name):
     user_id = str(call.from_user.id)
@@ -60,7 +83,7 @@ def claim_account(bot, call, platform_name):
         bot.send_message(call.message.chat.id, "User not found. Please /start the bot first.")
         return
     conn = __import__('db').get_connection()
-    conn.row_factory = __import__('sqlite3').Row
+    conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("SELECT * FROM platforms WHERE platform_name = ?", (platform_name,))
     platform = c.fetchone()
@@ -88,24 +111,8 @@ def claim_account(bot, call, platform_name):
     update_stock_for_platform(platform_name, stock)
     new_points = current_points - price
     update_user_points(user_id, new_points)
-    log_event(bot, "account_claim", f"User {user_id} claimed an account from {platform_name}. Account: {account}. New balance: {new_points} pts.")
+    log_event(bot, "account_claim", f"User {user_id} claimed an account from {platform_name}. New balance: {new_points} pts.")
     
-    # Send premium account message with formatted spacing
-    premium_text = f"""
-🎉✨ 𝗣𝗥𝗘𝗠𝗜𝗨𝗠 𝗔𝗖𝗖𝗢𝗨𝗡𝗧 𝗨𝗡𝗟𝗢𝗖𝗞𝗘𝗗 
-
-✨🎉📦 𝗦𝗲𝗿𝘃𝗶𝗰𝗲: {platform_name} 🔑 𝗬𝗼𝘂𝗿  
-
-𝗔𝗰𝗰𝗼𝗻𝘁: {account} 📌 
-
-𝗛𝗼𝘄 𝘁𝗼 𝗹𝗼𝗴𝗶𝗻:
-1️⃣ Copy the details
-2️⃣ Open app/website
-3️⃣ Paste & login
-
-❌ 𝗔𝗰𝗰𝗼𝗻𝘁 𝗻𝗼𝘁 𝘄𝗼𝗿𝗸𝗶𝗻𝗴? 𝗥𝗲𝗽𝗼𝗿𝘁 𝗯𝗲𝗹𝗼𝘄 𝘁𝗼 𝗴𝗲𝘁 𝗮 𝗿𝗲𝗳𝘂𝗻𝗱 𝗼𝗳 𝘆𝗼𝘂𝗿 𝗽𝗼𝗶𝗻𝘁𝘀!
-By @shadowsquad0
-    """
-    bot.send_message(call.message.chat.id, premium_text, parse_mode="HTML")
-
-# End of rewards.py
+    # Send the formatted premium account info
+    send_premium_account_info(bot, call.message.chat.id, platform_name, account)
+    
