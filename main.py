@@ -182,40 +182,46 @@ def report_command(message):
     msg = bot.send_message(message.chat.id, "📝 Please type your report message (text and optional screenshot):")
     bot.register_next_step_handler(msg, process_report)
 
-def process_report(message):
-    report_text = message.text
-    for owner in config.OWNERS:
-        try:
-            bot.send_message(owner, f"🚨 Report from {message.from_user.username or message.from_user.first_name} ({message.from_user.id}):\n\n{report_text}")
-        except Exception as e:
-            print(f"Error forwarding report to owner {owner}: {e}")
-    bot.send_message(message.chat.id, "✅ Your report has been submitted. Thank you!")
-    log_event(bot, "report", f"User {message.from_user.id} submitted a report.")
+def process_report(bot, message):
+    """
+    Process a report from a user and forward it to the owners.
+    It supports photo, document, and text messages. If a media message includes a caption,
+    that caption (plus any additional text if available) will be forwarded.
+    """
+    # Combine caption and text if available.
+    report_text = ""
+    if message.content_type in ["photo", "document"]:
+        # Use caption if provided; if not, default to empty string.
+        report_text = message.caption or ""
+    # If there's any text (e.g. for text-only messages), use it.
+    if hasattr(message, "text") and message.text:
+        # If report_text already exists (from caption), append the text.
+        if report_text:
+            report_text = f"{report_text}\n{message.text}"
+        else:
+            report_text = message.text
 
-# Callback query handler for Report button on claimed account
-@bot.callback_query_handler(func=lambda call: call.data == "report_account")
-def callback_report_account(call):
-    msg = bot.send_message(call.message.chat.id, "📝 Please type your report message and attach an image (if any):")
-    bot.register_next_step_handler(msg, process_account_report)
+    # Construct a header using both the user ID and username/first_name.
+    user = message.from_user
+    username = user.username if user.username else user.first_name
+    report_header = f"Report from {username} ({user.id}):\n\n"
 
-def process_account_report(message):
-    if message.content_type == "photo":
-        report_text = message.caption if message.caption else ""
-        photo_file_id = message.photo[-1].file_id
-    else:
-        report_text = message.text
-        photo_file_id = None
-    for owner in config.OWNERS:
+    # Forward the report to all owners defined in config.OWNERS.
+    from config import OWNERS
+    for owner in OWNERS:
         try:
-            if photo_file_id:
-                bot.send_photo(owner, photo_file_id, caption=f"🚨 Report from {message.from_user.username or message.from_user.first_name} ({message.from_user.id}):\n\n{report_text}")
+            if message.content_type == "photo":
+                # Use the highest-resolution photo from the list.
+                photo_id = message.photo[-1].file_id
+                bot.send_photo(owner, photo_id, caption=report_header + report_text, parse_mode="HTML")
+            elif message.content_type == "document":
+                bot.send_document(owner, message.document.file_id, caption=report_header + report_text, parse_mode="HTML")
             else:
-                bot.send_message(owner, f"🚨 Report from {message.from_user.username or message.from_user.first_name} ({message.from_user.id}):\n\n{report_text}")
+                bot.send_message(owner, report_header + report_text, parse_mode="HTML")
         except Exception as e:
-            print(f"Error forwarding report to owner {owner}: {e}")
+            print(f"Error sending report to owner {owner}: {e}")
     bot.send_message(message.chat.id, "✅ Your report has been submitted. Thank you!")
-    log_event(bot, "report", f"User {message.from_user.id} submitted a report: {report_text}")
-
+    
 # Callback query handlers for menu navigation and admin commands
 
 @bot.callback_query_handler(func=lambda call: call.data == "back_main")
