@@ -8,13 +8,17 @@ import telebot
 from db import get_user, ban_user, unban_user, update_user_points, get_account_claim_cost
 from handlers.logs import log_event
 
-# Check if a user is admin or owner
 def is_admin(user_or_id):
     try:
-        user_id = str(user_or_id.id)
+        # If passed a dictionary (e.g. from get_user), use its "telegram_id" field.
+        if isinstance(user_or_id, dict):
+            user_id = str(user_or_id.get("telegram_id"))
+        else:
+            user_id = str(user_or_id.id)
     except AttributeError:
         user_id = str(user_or_id)
     return user_id in config.OWNERS or user_id in config.ADMINS
+
 
 # -----------------------
 # PLATFORM MANAGEMENT FUNCTIONS
