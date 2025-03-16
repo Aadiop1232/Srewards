@@ -14,6 +14,7 @@ from handlers.logs import log_event
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
 init_db()
 
+# /start command: creates user, processes referrals, and starts verification.
 @bot.message_handler(commands=["start"])
 def start_command(message):
     print(f"[DEBUG] /start received from user: {message.from_user.id}")
@@ -28,7 +29,7 @@ def start_command(message):
             pending_referrer=pending_ref
         )
         user = get_user(user_id)
-    # Process referral if a pending referral exists
+    # Process referral if pending_referrer is set in the user's record.
     if user.get("pending_referrer"):
         process_verified_referral(user_id, bot)
     if is_admin(message.from_user):
@@ -38,6 +39,7 @@ def start_command(message):
     bot.send_message(message.chat.id, "⏳ Verifying your channel membership, please wait...")
     send_verification_message(bot, message)
 
+# /lend command: allows owners to lend points.
 @bot.message_handler(commands=["lend"])
 def lend_command(message):
     if str(message.from_user.id) not in config.OWNERS:
@@ -58,6 +60,7 @@ def lend_command(message):
     bot.reply_to(message, result)
     log_event(bot, "lend", f"Admin {message.from_user.id} lent {points} pts to user {user_id}.", user=message.from_user)
 
+# /redeem command: allows users to redeem keys.
 @bot.message_handler(commands=["redeem"])
 def redeem_command(message):
     user_id = str(message.from_user.id)
@@ -70,11 +73,13 @@ def redeem_command(message):
     bot.reply_to(message, result)
     log_event(bot, "key_claim", f"User {user_id} redeemed key {key}. Result: {result}", user=message.from_user)
 
+# /report command: allows users to send a report (with photo/document support).
 @bot.message_handler(commands=["report"])
 def report_command(message):
     msg = bot.send_message(message.chat.id, "📝 Please type your report message (you may attach a photo or document):")
     bot.register_next_step_handler(msg, lambda m: process_report(bot, m))
 
+# /tutorial command: sends a tutorial message.
 @bot.message_handler(commands=["tutorial"])
 def tutorial_command(message):
     text = (
@@ -89,6 +94,38 @@ def tutorial_command(message):
     )
     bot.send_message(message.chat.id, text, parse_mode="HTML")
 
+# /gen command: allows admins/owners to generate keys.
+@bot.message_handler(commands=["gen"])
+def gen_command(message):
+    if str(message.from_user.id) not in config.ADMINS and str(message.from_user.id) not in config.OWNERS:
+        bot.reply_to(message, "🚫 You don't have permission to generate keys.")
+        return
+    parts = message.text.strip().split()
+    if len(parts) < 3:
+        bot.reply_to(message, "Usage: /gen <normal|premium> <quantity>")
+        return
+    key_type = parts[1].lower()
+    try:
+        qty = int(parts[2])
+    except ValueError:
+        bot.reply_to(message, "Quantity must be a number.")
+        return
+    generated = []
+    if key_type == "normal":
+        from handlers.admin import generate_normal_key
+        for _ in range(qty):
+            generated.append(generate_normal_key())
+    elif key_type == "premium":
+        from handlers.admin import generate_premium_key
+        for _ in range(qty):
+            generated.append(generate_premium_key())
+    else:
+        bot.reply_to(message, "Key type must be either 'normal' or 'premium'.")
+        return
+    text = "Keys generated:\n" + "\n".join(generated)
+    bot.reply_to(message, text)
+
+# Callback: Back button returns to main menu preserving admin info.
 @bot.callback_query_handler(func=lambda call: call.data == "back_main")
 def callback_back_main(call):
     try:
@@ -96,7 +133,7 @@ def callback_back_main(call):
     except Exception as e:
         print("Error deleting message:", e)
     from handlers.main_menu import send_main_menu
-    send_main_menu(bot, call)  # Pass the full call object so that call.from_user is used
+    send_main_menu(bot, call)  # Pass the full call so that call.from_user is used
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("verify"))
 def callback_verify(call):
@@ -132,6 +169,7 @@ def callback_menu(call):
     else:
         bot.answer_callback_query(call.id, "Unknown menu command.")
 
+# Callback: Generate referral link.
 @bot.callback_query_handler(func=lambda call: call.data == "get_ref_link")
 def callback_get_ref_link(call):
     from handlers.referral import get_referral_link
