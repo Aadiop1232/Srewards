@@ -56,14 +56,14 @@ def gen_command(message):
         return
     generated = []
     if key_type == "normal":
-        from handlers.admin import generate_normal_key  # Implement this as needed
+        from handlers.admin import generate_normal_key  # Already defined
         for _ in range(qty):
             key = generate_normal_key()
-            from handlers.admin import add_key  # Already defined in admin.py
+            from handlers.admin import add_key  # Already defined
             add_key(key, "normal", 15)
             generated.append(key)
     elif key_type == "premium":
-        from handlers.admin import generate_premium_key  # Implement this as needed
+        from handlers.admin import generate_premium_key  # Already defined or implemented similarly
         for _ in range(qty):
             key = generate_premium_key()
             from handlers.admin import add_key
@@ -110,12 +110,16 @@ def tutorial_command(message):
 
 @bot.message_handler(commands=["lend"])
 def lend_command(message):
+    """
+    Command format: /lend <user_id> <points> [custom message]
+    The custom message is optional. If provided, it will be sent to the user.
+    """
     if str(message.from_user.id) not in config.OWNERS:
         bot.reply_to(message, "🚫 You don't have permission to use this command.")
         return
-    parts = message.text.strip().split()
+    parts = message.text.strip().split(maxsplit=3)
     if len(parts) < 3:
-        bot.reply_to(message, "Usage: /lend <user_id> <points>")
+        bot.reply_to(message, "Usage: /lend <user_id> <points> [custom message]")
         return
     user_id = parts[1]
     try:
@@ -123,7 +127,8 @@ def lend_command(message):
     except ValueError:
         bot.reply_to(message, "Points must be a number.")
         return
-    result = lend_points(message.from_user.id, user_id, points)
+    custom_message = parts[3] if len(parts) == 4 else None
+    result = lend_points(message.from_user.id, user_id, points, custom_message)
     bot.reply_to(message, result)
     log_event(bot, "lend", f"Admin {message.from_user.id} lent {points} pts to user {user_id}.")
 
@@ -178,7 +183,31 @@ def process_report(message):
     bot.send_message(message.chat.id, "✅ Your report has been submitted. Thank you!")
     log_event(bot, "report", f"User {message.from_user.id} submitted a report.")
 
-# Callback query handlers
+# New callback handler for Report button on claimed account
+@bot.callback_query_handler(func=lambda call: call.data == "report_account")
+def callback_report_account(call):
+    msg = bot.send_message(call.message.chat.id, "📝 Please type your report message and attach an image (if any):")
+    bot.register_next_step_handler(msg, process_account_report)
+
+def process_account_report(message):
+    if message.content_type == "photo":
+        report_text = message.caption if message.caption else ""
+        photo_file_id = message.photo[-1].file_id
+    else:
+        report_text = message.text
+        photo_file_id = None
+    for owner in config.OWNERS:
+        try:
+            if photo_file_id:
+                bot.send_photo(owner, photo_file_id, caption=f"🚨 Report from {message.from_user.username or message.from_user.first_name} ({message.from_user.id}):\n\n{report_text}")
+            else:
+                bot.send_message(owner, f"🚨 Report from {message.from_user.username or message.from_user.first_name} ({message.from_user.id}):\n\n{report_text}")
+        except Exception as e:
+            print(f"Error forwarding report to owner {owner}: {e}")
+    bot.send_message(message.chat.id, "✅ Your report has been submitted. Thank you!")
+    log_event(bot, "report", f"User {message.from_user.id} submitted a report: {report_text}")
+
+# Callback query handlers for other menu commands
 @bot.callback_query_handler(func=lambda call: call.data == "back_main")
 def callback_back_main(call):
     try:
@@ -244,3 +273,4 @@ def callback_menu_review(call):
     prompt_review(bot, call.message)
 
 bot.polling(none_stop=True)
+                     
