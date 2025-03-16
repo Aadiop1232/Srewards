@@ -1,5 +1,6 @@
 # main.py
 import telebot
+import time
 import config
 from datetime import datetime
 from db import init_db, add_user, get_user, claim_key_in_db
@@ -281,4 +282,15 @@ def callback_get_ref_link(call):
 def callback_menu_review(call):
     prompt_review(bot, call.message)
 
-bot.polling(none_stop=True)
+while True:
+    try:
+        bot.polling(none_stop=True)
+    except Exception as e:
+        # You can log the error via a logging module or send a message to your log channel
+        print(f"Polling error: {e}")
+        # Optionally, send a message via the bot to your log channel
+        try:
+            bot.send_message(config.LOGS_CHANNEL, f"Polling error: {e}")
+        except Exception:
+            pass
+        time.sleep(15)  # Wait for 15 seconds before restarting polling
