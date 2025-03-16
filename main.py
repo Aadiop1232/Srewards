@@ -93,7 +93,6 @@ def tutorial_command(message):
 
 @bot.message_handler(commands=["gen"])
 def gen_command(message):
-    # Only allow admins/owners to generate keys
     if str(message.from_user.id) not in config.ADMINS and str(message.from_user.id) not in config.OWNERS:
         bot.reply_to(message, "🚫 You don't have permission to generate keys.")
         return
@@ -125,7 +124,8 @@ def gen_command(message):
         text = "Redeem Generated ✅\n"
         for key in generated:
             text += f"➔ <code>{key}</code>\n"
-        text += "\nYou can redeem this code using this command: /redeem <Key>"
+        # Escape the angle brackets here for HTML
+        text += "\nYou can redeem this code using this command: /redeem &lt;Key&gt;"
     else:
         text = "No keys generated."
     bot.reply_to(message, text, parse_mode="HTML")
@@ -137,7 +137,7 @@ def callback_back_main(call):
     except Exception as e:
         print("Error deleting message:", e)
     from handlers.main_menu import send_main_menu
-    send_main_menu(bot, call)  # Pass full call to preserve admin info
+    send_main_menu(bot, call)  # Pass the full call to preserve admin info
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("verify"))
 def callback_verify(call):
