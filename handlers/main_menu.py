@@ -3,7 +3,6 @@ from db import get_user
 from handlers.admin import is_admin
 
 def send_main_menu(bot, update):
-    # Get chat_id and fetch the latest user record from DB
     if hasattr(update, "message") and update.message:
         chat_id = update.message.chat.id
         user = get_user(str(update.message.from_user.id))
