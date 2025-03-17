@@ -4,7 +4,7 @@ from datetime import datetime
 from db import init_db, add_user, get_user, claim_key_in_db
 from handlers.verification import send_verification_message, handle_verification_callback
 from handlers.main_menu import send_main_menu
-from handlers.referral import extract_referral_code, process_verified_referral, send_referral_menu, get_referral_link
+from handlers.referral import extract_referral_code  # Removed process_verified_referral call here
 from handlers.rewards import send_rewards_menu, handle_platform_selection, claim_account
 from handlers.review import prompt_review, process_report
 from handlers.account_info import send_account_info
@@ -39,8 +39,7 @@ def start_command(message):
             pending_referrer=pending_ref
         )
         user = get_user(user_id)
-    if user.get("pending_referrer"):
-        process_verified_referral(user_id, bot)
+    # Removed immediate referral bonus processing from here.
     if is_admin(get_user(user_id)):
         bot.send_message(message.chat.id, "✨ Welcome, Admin/Owner! You are automatically verified! ✨")
         send_main_menu(bot, message)
@@ -82,7 +81,7 @@ def redeem_command(message):
     key = parts[1].strip()
     result = claim_key_in_db(key, user_id)
     bot.reply_to(message, result)
-    log_event(bot, "key_claim", f"User  {user_id} redeemed key {key}. Result: {result}", user=message.from_user)
+    log_event(bot, "key_claim", f"User {user_id} redeemed key {key}. Result: {result}", user=message.from_user)
 
 @bot.message_handler(commands=["report"])
 def report_command(message):
@@ -142,7 +141,8 @@ def gen_command(message):
         text = "Redeem Generated ✅\n"
         for key in generated:
             text += f"➔ <code>{key}</code>\n"
-        text += "\nYou can redeem this code using this command: /redeem <Key>"
+        # Updated instruction text to avoid HTML parsing issues
+        text += "\nYou can redeem this code using this command: /redeem KEY"
     else:
         text = "No keys generated."
     bot.reply_to(message, text, parse_mode="HTML")
