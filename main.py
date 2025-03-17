@@ -17,7 +17,6 @@ bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
 init_db()
 
 def check_if_banned(message):
-    """Check if the user is banned. If so, send an error and return True."""
     user = get_user(str(message.from_user.id))
     if user and user.get("banned", 0):
         bot.send_message(message.chat.id, "🚫 You are banned and cannot use this bot.")
@@ -58,7 +57,7 @@ def lend_command(message):
         return
     parts = message.text.strip().split()
     if len(parts) < 3:
-        bot.reply_to(message, "Usage: /lend &lt;user_id&gt; &lt;points&gt; [custom message]", parse_mode="HTML")
+        bot.reply_to(message, "Usage: /lend <user_id> <points> [custom message]", parse_mode="HTML")
         return
     user_id = parts[1]
     try:
@@ -67,7 +66,7 @@ def lend_command(message):
         bot.reply_to(message, "Points must be a number.")
         return
     custom_message = " ".join(parts[3:]) if len(parts) > 3 else None
-    result = lend_points(message.from_user.id, user_id, points, custom_message)
+    result = lend_points(str(message.from_user.id), user_id, points, custom_message)
     bot.reply_to(message, result)
     log_event(bot, "lend", f"Owner {message.from_user.id} lent {points} pts to user {user_id}.", user=message.from_user)
 
@@ -83,7 +82,7 @@ def redeem_command(message):
     key = parts[1].strip()
     result = claim_key_in_db(key, user_id)
     bot.reply_to(message, result)
-    log_event(bot, "key_claim", f"User {user_id} redeemed key {key}. Result: {result}", user=message.from_user)
+    log_event(bot, "key_claim", f"User  {user_id} redeemed key {key}. Result: {result}", user=message.from_user)
 
 @bot.message_handler(commands=["report"])
 def report_command(message):
@@ -143,7 +142,7 @@ def gen_command(message):
         text = "Redeem Generated ✅\n"
         for key in generated:
             text += f"➔ <code>{key}</code>\n"
-        text += "\nYou can redeem this code using this command: /redeem &lt;Key&gt;"
+        text += "\nYou can redeem this code using this command: /redeem <Key>"
     else:
         text = "No keys generated."
     bot.reply_to(message, text, parse_mode="HTML")
@@ -155,7 +154,7 @@ def callback_back_main(call):
     except Exception as e:
         print("Error deleting message:", e)
     from handlers.main_menu import send_main_menu
-    send_main_menu(bot, call
+    send_main_menu(bot, call.message)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("verify"))
 def callback_verify(call):
@@ -172,7 +171,7 @@ def callback_menu(call):
         send_rewards_menu(bot, call.message)
     elif call.data == "menu_info":
         from handlers.account_info import send_account_info
-        send_account_info(bot, call)
+        send_account_info(bot, call.message)
     elif call.data == "menu_referral":
         from handlers.referral import send_referral_menu
         send_referral_menu(bot, call.message)
@@ -187,14 +186,14 @@ def callback_menu(call):
         send_support_message(bot, call.message)
     elif call.data == "menu_admin":
         from handlers.admin import send_admin_menu
-        send_admin_menu(bot, call)
+        send_admin_menu(bot, call.message)
     else:
         bot.answer_callback_query(call.id, "Unknown menu command.")
 
 @bot.callback_query_handler(func=lambda call: call.data == "get_ref_link")
 def callback_get_ref_link(call):
     from handlers.referral import get_referral_link
-    referral_link = get_referral_link(call.from_user.id)
+    referral_link = get_referral_link(str(call.from_user.id))
     bot.answer_callback_query(call.id, "Referral link generated!")
     bot.send_message(call.message.chat.id, f"Your referral link:\n{referral_link}")
 
