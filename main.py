@@ -40,10 +40,9 @@ def start_command(message):
             pending_referrer=pending_ref
         )
         user = get_user(user_id)
-    # Process referral if pending_referrer exists in the user's record
     if user.get("pending_referrer"):
         process_verified_referral(user_id, bot)
-    if is_admin(get_user(user_id)):  # Fetch the latest record from DB for admin check
+    if is_admin(get_user(user_id)):
         bot.send_message(message.chat.id, "✨ Welcome, Admin/Owner! You are automatically verified! ✨")
         send_main_menu(bot, message)
         return
@@ -54,7 +53,6 @@ def start_command(message):
 def lend_command(message):
     if check_if_banned(message):
         return
-    # Only owners can use /lend
     if str(message.from_user.id) not in config.OWNERS:
         bot.reply_to(message, "🚫 You don't have permission to use this command.")
         return
