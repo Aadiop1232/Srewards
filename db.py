@@ -257,10 +257,6 @@ def get_admins():
     return [dict(a) for a in admins]
 
 
-# -----------------------
-# Key Functions
-# -----------------------
-
 def get_key(key_str):
     conn = get_connection()
     conn.row_factory = sqlite3.Row
@@ -314,10 +310,6 @@ def get_keys():
     conn.close()
     return [dict(k) for k in keys]
 
-# -----------------------
-# Additional Functions
-# -----------------------
-
 def get_leaderboard(limit=10):
     conn = get_connection()
     conn.row_factory = sqlite3.Row
@@ -341,9 +333,6 @@ def get_admin_dashboard():
     conn.close()
     return total_users, banned_users, total_points
 
-# -----------------------
-# get_platforms and update_stock_for_platform
-# -----------------------
 
 def get_platforms():
     conn = get_connection()
@@ -362,7 +351,6 @@ def update_stock_for_platform(platform_name, stock):
     conn.commit()
     c.close()
     conn.close()
-    # Log the update using a TeleBot instance for logging.
     log_event(telebot.TeleBot(config.TOKEN), "stock", f"Platform '{platform_name}' stock updated to {len(stock)} accounts.")
 
 if __name__ == '__main__':
