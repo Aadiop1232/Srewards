@@ -8,28 +8,18 @@ from db import get_user, ban_user, unban_user, update_user_points, get_account_c
 from handlers.logs import log_event
 
 def is_admin(user_or_id):
-    """
-    Check if the given user (or user id) is an admin.
-    If a dictionary is passed (from the DB), use its "telegram_id" field.
-    Otherwise, check the user object's id.
-    This function now also checks the admins table in the DB.
-    """
     try:
-        # If it's a dictionary (from the DB record)
         if isinstance(user_or_id, dict):
             user_id = str(user_or_id.get("telegram_id"))
         else:
             user_id = str(user_or_id.id)
     except AttributeError:
         user_id = str(user_or_id)
-    # Check against owners (from config) and against admins stored in the DB.
     db_admins = get_admins()
     db_admin_ids = [admin.get("user_id") for admin in db_admins]
     return user_id in config.OWNERS or user_id in db_admin_ids
 
-# -----------------------
-# PLATFORM MANAGEMENT FUNCTIONS
-# -----------------------
+
 
 def add_platform(platform_name, price):
     """
@@ -93,9 +83,7 @@ def update_stock_for_platform(platform_name, stock):
     conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "stock", f"Platform '{platform_name}' stock updated to {len(stock)} accounts.")
 
-# -----------------------
-# CHANNEL MANAGEMENT FUNCTIONS
-# -----------------------
+
 
 def add_channel(channel_link):
     conn = __import__('db').get_connection()
@@ -125,9 +113,7 @@ def get_channels():
     conn.close()
     return [dict(ch) for ch in channels]
 
-# -----------------------
-# ADMINS MANAGEMENT FUNCTIONS
-# -----------------------
+
 
 def get_admins():
     conn = __import__('db').get_connection()
@@ -181,9 +167,7 @@ def unban_admin(user_id):
     conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "admin", f"Admin '{user_id}' unbanned.")
 
-# -----------------------
-# KEY FUNCTIONS (Key Generation)
-# -----------------------
+
 
 def generate_normal_key():
     import random, string
@@ -205,9 +189,6 @@ def add_key(key_str, key_type, points):
     c.close()
     conn.close()
 
-# -----------------------
-# LENDING POINTS
-# -----------------------
 
 def lend_points(admin_id, user_id, points, custom_message=None):
     user = get_user(user_id)
@@ -224,9 +205,7 @@ def lend_points(admin_id, user_id, points, custom_message=None):
         print(f"Error sending message to user {user_id}: {e}")
     return f"{points} points have been added to user {user_id}. New balance: {new_balance} points."
 
-# -----------------------
-# DYNAMIC CONFIGURATION COMMANDS
-# -----------------------
+
 
 def update_account_claim_cost(cost):
     from db import set_config_value
@@ -238,9 +217,6 @@ def update_referral_bonus(bonus):
     set_config_value("referral_bonus", bonus)
     log_event(telebot.TeleBot(config.TOKEN), "config", f"Referral bonus updated to {bonus} points.")
 
-# -----------------------
-# USER MANAGEMENT (for Admin Panel)
-# -----------------------
 
 def get_all_users():
     from db import get_connection
@@ -253,9 +229,7 @@ def get_all_users():
     conn.close()
     return [dict(u) for u in users]
 
-# -----------------------
-# ADMIN PANEL CALLBACK ROUTER AND HANDLERS
-# -----------------------
+
 
 def send_admin_menu(bot, update):
     # Try to extract chat_id and user from either a Message or CallbackQuery.
@@ -291,7 +265,7 @@ def send_admin_menu(bot, update):
     except Exception:
         bot.send_message(chat_id, "🛠 Admin Panel", reply_markup=markup)
 
-# ----- PLATFORM MANAGEMENT HANDLERS -----
+
 
 def handle_admin_platform(bot, call):
     markup = types.InlineKeyboardMarkup(row_width=2)
@@ -393,7 +367,6 @@ def process_stock_upload_admin(bot, message, platform_name, retries=3):
     bot.send_message(message.chat.id, f"Stock for '{platform_name}' updated with {len(accounts)} accounts.")
     send_admin_menu(bot, message)
 
-# ----- CHANNEL MANAGEMENT HANDLERS -----
 
 def handle_admin_channel(bot, call):
     markup = types.InlineKeyboardMarkup(row_width=2)
