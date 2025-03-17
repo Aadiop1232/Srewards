@@ -117,6 +117,15 @@ def add_verified_column():
     c.close()
     conn.close()
 
+def update_user_verified(telegram_id):
+    """Marks a user as verified."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE users SET verified = 1 WHERE telegram_id = ?", (telegram_id,))
+    conn.commit()
+    c.close()
+    conn.close()
+
 
 # -----------------------
 # Dynamic Configuration Functions
