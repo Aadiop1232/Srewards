@@ -3,15 +3,13 @@ from db import get_user
 from handlers.admin import is_admin
 
 def send_main_menu(bot, update):
-    if hasattr(update, "message") and update.message:
-        chat_id = update.message.chat.id
-        user = get_user(str(update.message.from_user.id))
-    elif hasattr(update, "from_user") and update.from_user:
-        chat_id = update.message.chat.id if hasattr(update, "message") and update.message else update.chat.id
+    if hasattr(update, "from_user"):
         user = get_user(str(update.from_user.id))
+        # Determine chat_id from update (whether it's a message or callback)
+        chat_id = update.chat.id if hasattr(update, "chat") else update.message.chat.id
     else:
-        chat_id = update.chat.id
-        user = get_user(str(update.from_user.id))
+        user = get_user(str(update.message.from_user.id))
+        chat_id = update.message.chat.id
     
     markup = types.InlineKeyboardMarkup(row_width=3)
     markup.add(
