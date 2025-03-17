@@ -16,15 +16,23 @@ def extract_referral_code(message):
 
 def process_verified_referral(telegram_id, bot_instance):
     """
-    If the new user has a pending referrer, add a referral record,
-    award bonus points to the referrer, clear the pending flag,
-    and notify the referrer.
+    Ensures the user is verified before awarding referral points
+    and notifying the referrer.
     """
     user = get_user(str(telegram_id))
-    if user and user.get("pending_referrer"):
+    
+    # Ensure the user is verified before processing referral points
+    if user and user.get("pending_referrer") and not user.get("verified"):
         referrer_id = user.get("pending_referrer")
+        
+        # Mark the user as verified
+        update_user_verified(str(telegram_id))
+
+        # Now safely add referral points
         add_referral(referrer_id, user.get("telegram_id"))
         clear_pending_referral(str(telegram_id))
+        
+        # Notify the referrer about their reward
         try:
             bot_instance.send_message(
                 referrer_id,
@@ -33,7 +41,9 @@ def process_verified_referral(telegram_id, bot_instance):
             )
         except Exception as e:
             print(f"Error notifying referrer: {e}")
+        
         log_event(bot_instance, "referral", f"User {referrer_id} referred user {user.get('telegram_id')}.")
+
         
 def send_referral_menu(bot, message):
     """Send a referral menu with the user's referral link."""
