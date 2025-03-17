@@ -58,6 +58,9 @@ def handle_verification_callback(bot, call):
     Rechecks channel membership and shows the main menu if verified.
     """
     if check_channel_membership(bot, call.from_user.id):
+        # Process referral bonus after successful verification
+        from handlers.referral import process_verified_referral
+        process_verified_referral(call.from_user.id, bot)
         bot.answer_callback_query(call.id, "✅ Verification successful! 🎉")
         send_main_menu(bot, call.message)
     else:
