@@ -104,6 +104,20 @@ c.execute('''
     conn.close()
     print("Database initialized.")
 
+
+def add_verified_column():
+    """Adds the 'verified' column to the 'users' table if it doesn't already exist."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("PRAGMA table_info(users)")
+    columns = [column[1] for column in c.fetchall()]
+    if 'verified' not in columns:
+        c.execute("ALTER TABLE users ADD COLUMN verified INTEGER DEFAULT 0")
+        conn.commit()
+    c.close()
+    conn.close()
+
+
 # -----------------------
 # Dynamic Configuration Functions
 # -----------------------
