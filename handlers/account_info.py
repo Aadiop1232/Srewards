@@ -1,4 +1,3 @@
-# handlers/account_info.py
 from db import get_user, add_user
 from datetime import datetime
 
