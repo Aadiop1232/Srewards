@@ -6,8 +6,11 @@ def log_event(bot, event_type, message, user=None):
     If a user object is provided, include both user ID and username (or first name if username is missing).
     """
     if user:
-        uname = user.username if (hasattr(user, "username") and user.username) else user.first_name
-        user_info = f"User ID: {user.id}, Username: {uname}"
+        if isinstance(user, dict):
+            user_info = f"User ID: {user.get('telegram_id')}, Username: {user.get('username')}"
+        else:
+            uname = user.username if (hasattr(user, "username") and user.username) else user.first_name
+            user_info = f"User ID: {user.id}, Username: {uname}"
         full_message = f"[{event_type.upper()}] {user_info} - {message}"
     else:
         full_message = f"[{event_type.upper()}] {message}"
