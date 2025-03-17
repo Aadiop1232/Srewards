@@ -17,20 +17,19 @@ def init_db():
     """Initializes the database schema by creating all necessary tables if they do not exist."""
     conn = get_connection()
     c = conn.cursor()
-
     # Users table
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            telegram_id TEXT PRIMARY KEY,
-            username TEXT,
-            join_date TEXT,
-            points INTEGER DEFAULT 20,
-            referrals INTEGER DEFAULT 0,
-            banned INTEGER DEFAULT 0,
-            pending_referrer TEXT,
-            verified INTEGER DEFAULT 0
-        )
-    ''')
+c.execute('''
+    CREATE TABLE IF NOT EXISTS users (
+        telegram_id TEXT PRIMARY KEY,
+        username TEXT,
+        join_date TEXT,
+        points INTEGER DEFAULT 20,
+        referrals INTEGER DEFAULT 0,
+        banned INTEGER DEFAULT 0,
+        pending_referrer TEXT,
+        verified INTEGER DEFAULT 0
+    )
+''')
 
     # Referrals table
     c.execute('''
@@ -40,7 +39,6 @@ def init_db():
             PRIMARY KEY (user_id, referred_id)
         )
     ''')
-
     # Platforms table
     c.execute(f'''
         CREATE TABLE IF NOT EXISTS platforms (
@@ -49,7 +47,6 @@ def init_db():
             price INTEGER DEFAULT {config.DEFAULT_ACCOUNT_CLAIM_COST}
         )
     ''')
-
     # Reviews table
     c.execute('''
         CREATE TABLE IF NOT EXISTS reviews (
@@ -59,7 +56,6 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-
     # Admin logs table
     c.execute('''
         CREATE TABLE IF NOT EXISTS admin_logs (
@@ -69,7 +65,6 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-
     # Channels table
     c.execute('''
         CREATE TABLE IF NOT EXISTS channels (
@@ -77,7 +72,6 @@ def init_db():
             channel_link TEXT
         )
     ''')
-
     # Admins table
     c.execute('''
         CREATE TABLE IF NOT EXISTS admins (
@@ -87,7 +81,6 @@ def init_db():
             banned INTEGER DEFAULT 0
         )
     ''')
-
     # Keys table
     c.execute('''
         CREATE TABLE IF NOT EXISTS keys (
@@ -99,7 +92,6 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-
     # Configurations table
     c.execute('''
         CREATE TABLE IF NOT EXISTS configurations (
@@ -107,16 +99,11 @@ def init_db():
             config_value TEXT
         )
     ''')
-
     conn.commit()
     c.close()
     conn.close()
     print("Database initialized.")
 
-
-# -----------------------
-# New Verified User Handling
-# -----------------------
 
 def add_verified_column():
     """Adds the 'verified' column to the 'users' table if it doesn't already exist."""
@@ -139,6 +126,7 @@ def update_user_verified(telegram_id):
     c.close()
     conn.close()
 
+
 # -----------------------
 # Dynamic Configuration Functions
 # -----------------------
@@ -159,6 +147,20 @@ def get_config_value(key):
     c.close()
     conn.close()
     return row[0] if row else None
+
+def set_account_claim_cost(cost):
+    set_config_value("account_claim_cost", cost)
+
+def get_account_claim_cost():
+    cost = get_config_value("account_claim_cost")
+    return int(cost) if cost is not None else config.DEFAULT_ACCOUNT_CLAIM_COST
+
+def set_referral_bonus(bonus):
+    set_config_value("referral_bonus", bonus)
+
+def get_referral_bonus():
+    bonus = get_config_value("referral_bonus")
+    return int(bonus) if bonus is not None else config.DEFAULT_REFERRAL_BONUS
 
 # -----------------------
 # User Functions
@@ -189,6 +191,30 @@ def get_user(telegram_id):
     conn.close()
     return dict(user) if user else None
 
+def update_user_points(telegram_id, new_points):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE users SET points = ? WHERE telegram_id = ?", (new_points, telegram_id))
+    conn.commit()
+    c.close()
+    conn.close()
+
+def ban_user(telegram_id):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE users SET banned = 1 WHERE telegram_id = ?", (telegram_id,))
+    conn.commit()
+    c.close()
+    conn.close()
+
+def unban_user(telegram_id):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE users SET banned = 0 WHERE telegram_id = ?", (telegram_id,))
+    conn.commit()
+    c.close()
+    conn.close()
+
 # -----------------------
 # Referral Functions
 # -----------------------
@@ -215,6 +241,18 @@ def clear_pending_referral(telegram_id):
     conn.close()
 
 # -----------------------
+# Review Functions
+# -----------------------
+
+def add_review(user_id, review_text):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("INSERT INTO reviews (user_id, review, timestamp) VALUES (?, ?, ?)", (user_id, review_text, datetime.now()))
+    conn.commit()
+    c.close()
+    conn.close()
+
+# -----------------------
 # Admin Logs Functions
 # -----------------------
 
@@ -236,6 +274,7 @@ def get_admins():
     conn.close()
     return [dict(a) for a in admins]
 
+
 # -----------------------
 # Key Functions
 # -----------------------
@@ -252,6 +291,7 @@ def get_key(key_str):
 
 def claim_key_in_db(key_str, telegram_id):
     conn = get_connection()
+    conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("SELECT * FROM keys WHERE key = ?", (key_str,))
     key_doc = c.fetchone()
@@ -273,11 +313,76 @@ def claim_key_in_db(key_str, telegram_id):
     conn.close()
     return f"Key redeemed successfully. You've been awarded {points_awarded} points."
 
+def add_key(key_str, key_type, points):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("INSERT INTO keys (key, type, points, claimed, claimed_by, timestamp) VALUES (?, ?, ?, 0, NULL, ?)",
+              (key_str, key_type, points, datetime.now()))
+    conn.commit()
+    c.close()
+    conn.close()
+
+def get_keys():
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM keys")
+    keys = c.fetchall()
+    c.close()
+    conn.close()
+    return [dict(k) for k in keys]
+
 # -----------------------
-# Final Execution
+# Additional Functions
 # -----------------------
+
+def get_leaderboard(limit=10):
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT telegram_id, username, points FROM users ORDER BY points DESC LIMIT ?", (limit,))
+    leaderboard = c.fetchall()
+    c.close()
+    conn.close()
+    return [dict(row) for row in leaderboard]
+
+def get_admin_dashboard():
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM users")
+    total_users = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM users WHERE banned = 1")
+    banned_users = c.fetchone()[0]
+    c.execute("SELECT SUM(points) FROM users")
+    total_points = c.fetchone()[0] or 0
+    c.close()
+    conn.close()
+    return total_users, banned_users, total_points
+
+# -----------------------
+# get_platforms and update_stock_for_platform
+# -----------------------
+
+def get_platforms():
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM platforms")
+    platforms = c.fetchall()
+    c.close()
+    conn.close()
+    return [dict(p) for p in platforms]
+
+def update_stock_for_platform(platform_name, stock):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE platforms SET stock = ? WHERE platform_name = ?", (json.dumps(stock), platform_name))
+    conn.commit()
+    c.close()
+    conn.close()
+    # Log the update using a TeleBot instance for logging.
+    log_event(telebot.TeleBot(config.TOKEN), "stock", f"Platform '{platform_name}' stock updated to {len(stock)} accounts.")
 
 if __name__ == '__main__':
     init_db()
-    add_verified_column()
-    print("Database initialized with verified column added.")
+    print("Database initialized.")
