@@ -28,8 +28,8 @@ c.execute('''
         banned INTEGER DEFAULT 0,
         pending_referrer TEXT,
         verified INTEGER DEFAULT 0
-    )
-''')
+        )
+    ''')
 
     # Referrals table
     c.execute('''
@@ -127,10 +127,6 @@ def update_user_verified(telegram_id):
     conn.close()
 
 
-# -----------------------
-# Dynamic Configuration Functions
-# -----------------------
-
 def set_config_value(key, value):
     conn = get_connection()
     c = conn.cursor()
@@ -162,9 +158,6 @@ def get_referral_bonus():
     bonus = get_config_value("referral_bonus")
     return int(bonus) if bonus is not None else config.DEFAULT_REFERRAL_BONUS
 
-# -----------------------
-# User Functions
-# -----------------------
 
 def add_user(telegram_id, username, join_date, pending_referrer=None):
     conn = get_connection()
@@ -215,10 +208,6 @@ def unban_user(telegram_id):
     c.close()
     conn.close()
 
-# -----------------------
-# Referral Functions
-# -----------------------
-
 def add_referral(referrer_id, referred_id):
     conn = get_connection()
     c = conn.cursor()
@@ -240,10 +229,6 @@ def clear_pending_referral(telegram_id):
     c.close()
     conn.close()
 
-# -----------------------
-# Review Functions
-# -----------------------
-
 def add_review(user_id, review_text):
     conn = get_connection()
     c = conn.cursor()
@@ -252,9 +237,6 @@ def add_review(user_id, review_text):
     c.close()
     conn.close()
 
-# -----------------------
-# Admin Logs Functions
-# -----------------------
 
 def log_admin_action(admin_id, action):
     conn = get_connection()
