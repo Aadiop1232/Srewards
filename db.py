@@ -6,15 +6,12 @@ import config
 import telebot
 from handlers.logs import log_event
 
-# Path to the SQLite database file.
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bot.db")
 
 def get_connection():
-    """Returns a new connection to the SQLite database."""
     return sqlite3.connect(DATABASE)
 
 def init_db():
-    """Initializes the database schema by creating all necessary tables if they do not exist."""
     conn = get_connection()
     c = conn.cursor()
     # Users table
