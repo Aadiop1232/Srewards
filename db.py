@@ -18,7 +18,7 @@ def init_db():
     conn = get_connection()
     c = conn.cursor()
     # Users table
-c.execute('''
+    c.execute('''
     CREATE TABLE IF NOT EXISTS users (
         telegram_id TEXT PRIMARY KEY,
         username TEXT,
