@@ -18,17 +18,19 @@ def init_db():
     conn = get_connection()
     c = conn.cursor()
     # Users table
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            telegram_id TEXT PRIMARY KEY,
-            username TEXT,
-            join_date TEXT,
-            points INTEGER DEFAULT 20,
-            referrals INTEGER DEFAULT 0,
-            banned INTEGER DEFAULT 0,
-            pending_referrer TEXT
-        )
-    ''')
+c.execute('''
+    CREATE TABLE IF NOT EXISTS users (
+        telegram_id TEXT PRIMARY KEY,
+        username TEXT,
+        join_date TEXT,
+        points INTEGER DEFAULT 20,
+        referrals INTEGER DEFAULT 0,
+        banned INTEGER DEFAULT 0,
+        pending_referrer TEXT,
+        verified INTEGER DEFAULT 0
+    )
+''')
+
     # Referrals table
     c.execute('''
         CREATE TABLE IF NOT EXISTS referrals (
