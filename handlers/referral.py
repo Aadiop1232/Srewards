@@ -1,13 +1,9 @@
 import telebot
 import config
-from db import get_user, clear_pending_referral, add_referral
+from db import get_user, clear_pending_referral, add_referral, update_user_verified
 from handlers.logs import log_event
 
 def extract_referral_code(message):
-    """
-    Extract a referral code from the message text.
-    Expected format: ref_<referrer_id>
-    """
     if message.text and "ref_" in message.text:
         for part in message.text.split():
             if part.startswith("ref_"):
@@ -15,27 +11,18 @@ def extract_referral_code(message):
     return None
 
 def process_verified_referral(telegram_id, bot_instance):
-    """
-    Ensures the user is verified before awarding referral points
-    and notifying the referrer.
-    """
     user = get_user(str(telegram_id))
     
-    # Ensure the user is verified before processing referral points
     if user and user.get("pending_referrer") and not user.get("verified"):
         referrer_id = user.get("pending_referrer")
         
-        # Mark the user as verified
         update_user_verified(str(telegram_id))
-
-        # Now safely add referral points
         add_referral(referrer_id, user.get("telegram_id"))
         clear_pending_referral(str(telegram_id))
         
-        # Notify the referrer about their reward
         try:
             bot_instance.send_message(
-                referrer_id,
+                int(referrer_id),
                 "🎉 Referral completed! You earned bonus points!",
                 parse_mode="HTML"
             )
@@ -44,9 +31,7 @@ def process_verified_referral(telegram_id, bot_instance):
         
         log_event(bot_instance, "referral", f"User {referrer_id} referred user {user.get('telegram_id')}.")
 
-        
 def send_referral_menu(bot, message):
-    """Send a referral menu with the user's referral link."""
     telegram_id = str(message.from_user.id)
     text = "🔗 Referral System\nYour referral link is below."
     markup = telebot.types.InlineKeyboardMarkup()
@@ -55,5 +40,4 @@ def send_referral_menu(bot, message):
     bot.send_message(message.chat.id, text, reply_markup=markup, parse_mode="HTML")
 
 def get_referral_link(telegram_id):
-    """Return the referral link for a given Telegram ID."""
     return f"https://t.me/{config.BOT_USERNAME}?start=ref_{telegram_id}"
