@@ -128,12 +128,12 @@ def gen_command(message):
     generated = []
     if key_type == "normal":
         for _ in range(qty):
-            key = generate_normal_key()  # Format: NKEY-XXXXXXXXXX
+            key = generate_normal_key() 
             add_key(key, "normal", 15)
             generated.append(key)
     elif key_type == "premium":
         for _ in range(qty):
-            key = generate_premium_key()  # Format: PKEY-XXXXXXXXXX
+            key = generate_premium_key() 
             add_key(key, "premium", 90)
             generated.append(key)
     else:
@@ -155,7 +155,7 @@ def callback_back_main(call):
     except Exception as e:
         print("Error deleting message:", e)
     from handlers.main_menu import send_main_menu
-    send_main_menu(bot, call)  # Pass the full call object to preserve admin info
+    send_main_menu(bot, call
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("verify"))
 def callback_verify(call):
