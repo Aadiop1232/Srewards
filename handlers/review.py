@@ -9,7 +9,7 @@ def prompt_review(bot, message):
     msg = bot.send_message(message.chat.id, "💬 Please send your review or suggestion:")
     bot.register_next_step_handler(msg, process_review, bot)
 
-def process_review(bot, message):
+def process_review(message, bot):
     review_text = message.text
     add_review(str(message.from_user.id), review_text)
     for owner in config.OWNERS:
