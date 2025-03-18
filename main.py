@@ -4,7 +4,7 @@ import os
 import threading
 import time
 from datetime import datetime
-from db import init_db, add_user, get_user, claim_key_in_db, DATABASE
+from db import init_db, add_user, get_user, claim_key_in_db, DATABASE, get_all_users
 from handlers.verification import send_verification_message, handle_verification_callback
 from handlers.main_menu import send_main_menu
 from handlers.referral import extract_referral_code
@@ -17,7 +17,8 @@ from handlers.logs import log_event
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
 init_db()
 
-# /recover command: updates the current database with a replied document.
+# ------------------------------
+# /recover command: update current DB from replied file
 @bot.message_handler(commands=['recover'])
 def recover_command(message):
     if not message.reply_to_message or not message.reply_to_message.document:
@@ -36,20 +37,45 @@ def recover_command(message):
     except Exception as e:
         bot.reply_to(message, f"Error recovering database: {e}")
 
-# Daily backup thread: every 24 hours, the bot sends a copy of bot.db to each owner.
+# ------------------------------
+# Daily backup thread: every 24 hours, send bot.db to all owners
 def daily_backup():
     while True:
-        time.sleep(86400)  # 86400 seconds = 24 hours
+        time.sleep(86400)  # 24 hours
         try:
             with open(DATABASE, "rb") as f:
-                backup_file = f.read()
+                backup_data = f.read()
             for owner in config.OWNERS:
-                bot.send_document(owner, ("bot_backup.db", backup_file))
+                bot.send_document(owner, ("bot_backup.db", backup_data))
         except Exception as e:
             print(f"Error during daily backup: {e}")
 
 threading.Thread(target=daily_backup, daemon=True).start()
 
+# ------------------------------
+# Broadcast command: only owners can use this; sends a message to all users.
+@bot.message_handler(commands=["broadcast"])
+def broadcast_command(message):
+    if str(message.from_user.id) not in config.OWNERS:
+        bot.reply_to(message, "You are not authorized to use this command.")
+        return
+    # Get text after /broadcast command
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2:
+        bot.reply_to(message, "Usage: /broadcast <message>")
+        return
+    broadcast_text = parts[1]
+    users = get_all_users()  # Function from admin module (or implement similarly in db.py)
+    sent = 0
+    for user in users:
+        try:
+            bot.send_message(user.get("telegram_id"), f"[BROADCAST]\n\n{broadcast_text}")
+            sent += 1
+        except Exception as e:
+            print(f"Error broadcasting to {user.get('telegram_id')}: {e}")
+    bot.reply_to(message, f"Broadcast sent to {sent} users.")
+
+# ------------------------------
 def check_if_banned(message):
     user = get_user(str(message.from_user.id))
     if user and user.get("banned", 0):
@@ -98,7 +124,7 @@ def lend_command(message):
     custom_message = " ".join(parts[3:]) if len(parts) > 3 else None
     result = lend_points(str(message.from_user.id), user_id, points, custom_message)
     bot.reply_to(message, result)
-    log_event(bot, "lend", f"Admin {message.from_user.id} lent {points} points to user {user_id}.", user=message.from_user)
+    log_event(bot, "LEND", f"[LEND] {message.from_user.username or message.from_user.first_name} ({message.from_user.id}) lent {points} points to user {user_id}.", user=message.from_user)
 
 @bot.message_handler(commands=["redeem"])
 def redeem_command(message):
@@ -115,7 +141,7 @@ def redeem_command(message):
     key = parts[1].strip()
     result = claim_key_in_db(key, user_id)
     bot.reply_to(message, result)
-    log_event(bot, "key_claim", f"User {user_id} redeemed key {key}. Result: {result}", user=message.from_user)
+    log_event(bot, "ACCOUNT_CLAIM", f"[ACCOUNT_CLAIM] {message.from_user.username or message.from_user.first_name} ({user_id}) redeemed key {key}. Result: {result}", user=message.from_user)
 
 @bot.message_handler(commands=["report"])
 def report_command(message):
@@ -152,7 +178,7 @@ def gen_command(message):
         return
     parts = message.text.strip().split()
     if len(parts) < 3:
-        bot.reply_to(message, "Usage: /gen <normal|premium> <quantity>")
+        bot.reply_to(message, "Usage: /gen <normal|premium> <quantity> [points]", parse_mode="HTML")
         return
     key_type = parts[1].lower()
     try:
@@ -160,16 +186,25 @@ def gen_command(message):
     except ValueError:
         bot.reply_to(message, "Quantity must be a number.")
         return
+    # Allow an optional points parameter; if not provided, use defaults.
+    if len(parts) >= 4:
+        try:
+            key_points = int(parts[3])
+        except ValueError:
+            bot.reply_to(message, "Key points must be a number.")
+            return
+    else:
+        key_points = 15 if key_type == "normal" else 90
     generated = []
     if key_type == "normal":
         for _ in range(qty):
             key = generate_normal_key()
-            add_key(key, "normal", 15)
+            add_key(key, "normal", key_points)
             generated.append(key)
     elif key_type == "premium":
         for _ in range(qty):
             key = generate_premium_key()
-            add_key(key, "premium", 90)
+            add_key(key, "premium", key_points)
             generated.append(key)
     else:
         bot.reply_to(message, "Key type must be either 'normal' or 'premium'.")
