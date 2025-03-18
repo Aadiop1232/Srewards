@@ -1,7 +1,8 @@
 import telebot
 import config
+import os
 from datetime import datetime
-from db import init_db, add_user, get_user, claim_key_in_db
+from db import init_db, add_user, get_user, claim_key_in_db, DATABASE
 from handlers.verification import send_verification_message, handle_verification_callback
 from handlers.main_menu import send_main_menu
 from handlers.referral import extract_referral_code
@@ -13,6 +14,25 @@ from handlers.logs import log_event
 
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
 init_db()
+
+# /recover command: reply to a document to update the bot's database
+@bot.message_handler(commands=['recover'])
+def recover_command(message):
+    if not message.reply_to_message or not message.reply_to_message.document:
+        bot.reply_to(message, "Please reply to a database file (document) with /recover command.")
+        return
+    if str(message.from_user.id) not in config.OWNERS:
+        bot.reply_to(message, "You do not have permission to perform this action.")
+        return
+    try:
+        file_id = message.reply_to_message.document.file_id
+        file_info = bot.get_file(file_id)
+        downloaded_file = bot.download_file(file_info.file_path)
+        with open(DATABASE, "wb") as f:
+            f.write(downloaded_file)
+        bot.reply_to(message, "Database recovered successfully!")
+    except Exception as e:
+        bot.reply_to(message, f"Error recovering database: {e}")
 
 def check_if_banned(message):
     user = get_user(str(message.from_user.id))
@@ -43,7 +63,6 @@ def start_command(message):
 def lend_command(message):
     if check_if_banned(message):
         return
-    # Restrict admin commands to private chat
     if message.chat.type != "private":
         bot.send_message(message.from_user.id, "Please use the /lend command in a private chat.")
         return
@@ -63,14 +82,12 @@ def lend_command(message):
     custom_message = " ".join(parts[3:]) if len(parts) > 3 else None
     result = lend_points(str(message.from_user.id), user_id, points, custom_message)
     bot.reply_to(message, result)
-    log_event(bot, "lend", f"Admin {message.from_user.id} lent {points} points to user {user_id}.",
-            user=message.from_user)
+    log_event(bot, "lend", f"Admin {message.from_user.id} lent {points} points to user {user_id}.", user=message.from_user)
 
 @bot.message_handler(commands=["redeem"])
 def redeem_command(message):
     if check_if_banned(message):
         return
-    # Restrict purchase commands to private chat
     if message.chat.type != "private":
         bot.send_message(message.from_user.id, "Please use the /redeem command in a private chat.")
         return
@@ -82,8 +99,7 @@ def redeem_command(message):
     key = parts[1].strip()
     result = claim_key_in_db(key, user_id)
     bot.reply_to(message, result)
-    log_event(bot, "key_claim", f"User {user_id} redeemed key {key}. Result: {result}",
-            user=message.from_user)
+    log_event(bot, "key_claim", f"User {user_id} redeemed key {key}. Result: {result}", user=message.from_user)
 
 @bot.message_handler(commands=["report"])
 def report_command(message):
@@ -112,7 +128,6 @@ def tutorial_command(message):
 def gen_command(message):
     if check_if_banned(message):
         return
-    # Restrict to private chat
     if message.chat.type != "private":
         bot.send_message(message.from_user.id, "Please use the /gen command in a private chat.")
         return
