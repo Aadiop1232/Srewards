@@ -5,12 +5,10 @@ from handlers.admin import is_admin
 def send_main_menu(bot, update):
     if hasattr(update, "from_user"):
         user = get_user(str(update.from_user.id))
-        # Determine chat_id from update (whether it's a message or callback)
         chat_id = update.chat.id if hasattr(update, "chat") else update.message.chat.id
     else:
         user = get_user(str(update.message.from_user.id))
         chat_id = update.message.chat.id
-    
     markup = types.InlineKeyboardMarkup(row_width=3)
     markup.add(
         types.InlineKeyboardButton("🎉 Rewards", callback_data="menu_rewards"),
