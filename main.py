@@ -43,6 +43,10 @@ def start_command(message):
 def lend_command(message):
     if check_if_banned(message):
         return
+    # Restrict admin commands to private chat
+    if message.chat.type != "private":
+        bot.send_message(message.from_user.id, "Please use the /lend command in a private chat.")
+        return
     if str(message.from_user.id) not in config.ADMINS and str(message.from_user.id) not in config.OWNERS:
         bot.reply_to(message, "🚫 You don't have permission to use this command.")
         return
@@ -59,11 +63,16 @@ def lend_command(message):
     custom_message = " ".join(parts[3:]) if len(parts) > 3 else None
     result = lend_points(str(message.from_user.id), user_id, points, custom_message)
     bot.reply_to(message, result)
-    log_event(bot, "lend", f"Admin {message.from_user.id} lent {points} points to user {user_id}.", user=message.from_user)
+    log_event(bot, "lend", f"Admin {message.from_user.id} lent {points} points to user {user_id}.",
+            user=message.from_user)
 
 @bot.message_handler(commands=["redeem"])
 def redeem_command(message):
     if check_if_banned(message):
+        return
+    # Restrict purchase commands to private chat
+    if message.chat.type != "private":
+        bot.send_message(message.from_user.id, "Please use the /redeem command in a private chat.")
         return
     user_id = str(message.from_user.id)
     parts = message.text.split()
@@ -73,7 +82,8 @@ def redeem_command(message):
     key = parts[1].strip()
     result = claim_key_in_db(key, user_id)
     bot.reply_to(message, result)
-    log_event(bot, "key_claim", f"User {user_id} redeemed key {key}. Result: {result}", user=message.from_user)
+    log_event(bot, "key_claim", f"User {user_id} redeemed key {key}. Result: {result}",
+            user=message.from_user)
 
 @bot.message_handler(commands=["report"])
 def report_command(message):
@@ -101,6 +111,10 @@ def tutorial_command(message):
 @bot.message_handler(commands=["gen"])
 def gen_command(message):
     if check_if_banned(message):
+        return
+    # Restrict to private chat
+    if message.chat.type != "private":
+        bot.send_message(message.from_user.id, "Please use the /gen command in a private chat.")
         return
     if str(message.from_user.id) not in config.ADMINS and str(message.from_user.id) not in config.OWNERS:
         bot.reply_to(message, "🚫 You don't have permission to generate keys.")
