@@ -19,7 +19,8 @@ def send_rewards_menu(bot, message):
         price = platform.get("price") or get_account_claim_cost()
         btn_text = f"{platform_name} | Stock: {len(stock)} | Price: {price} pts"
         markup.add(types.InlineKeyboardButton(btn_text, callback_data=f"reward_{platform_name}"))
-    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="menu_rewards"))
+    # Change back button callback to "back_main" so it returns to the main menu
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
     try:
         bot.edit_message_text("<b>🎯 Available Platforms 🎯</b>",
                               chat_id=message.chat.id,
@@ -49,7 +50,8 @@ def handle_platform_selection(bot, call, platform_name):
     else:
         text = f"<b>{platform_name}</b>:\n😞 No accounts available at the moment.\nPrice: {price} pts per account"
         markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="menu_rewards"))
+    # Back button goes to main menu
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
     try:
         bot.edit_message_text(text,
                               chat_id=call.message.chat.id,
@@ -59,7 +61,7 @@ def handle_platform_selection(bot, call, platform_name):
         bot.send_message(call.message.chat.id, text, parse_mode="HTML", reply_markup=markup)
 
 def send_premium_account_info(bot, chat_id, platform_name, account_info):
-    text = f"""🎉✨ PREMIUM ACCOUNT UNLOCKED 
+    text = f"""🎉✨ PREMIUM ACCOUNT UNLOCKED
 
 ✨🎉📦 Service: {platform_name}
 
@@ -114,8 +116,11 @@ def claim_account(bot, call, platform_name):
     from db import update_user_points
     update_user_points(user_id, new_points)
     log_event(bot, "account_claim", f"User {user_id} claimed an account from {platform_name}. New balance: {new_points} pts.")
-    # Ensure that if the command is triggered in a group, the sensitive info is sent privately.
-    chat_id = call.message.chat.id
-    if call.message.chat.type != "private":
-        chat_id = call.from_user.id
-    send_premium_account_info(bot, chat_id, platform_name, account)
+    # Determine target chat for sensitive account info:
+    if call.message.chat.type == "private":
+        target_chat = call.message.chat.id
+    else:
+        target_chat = call.from_user.id
+        # Inform the group that details have been sent privately.
+        bot.send_message(call.message.chat.id, "Account details have been sent to your private messages. Please check your DMs.")
+    send_premium_account_info(bot, target_chat, platform_name, account)
