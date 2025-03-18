@@ -198,12 +198,16 @@ def lend_points(admin_id, user_id, points, custom_message=None):
     update_user_points(user_id, new_balance)
     log_event(telebot.TeleBot(config.TOKEN), "lend", f"Admin {admin_id} lent {points} points to user {user_id}.")
     bot_instance = telebot.TeleBot(config.TOKEN)
-    msg = custom_message if custom_message else f"You have been lent {points} points. Your new balance is {new_balance} points."
+    if custom_message:
+        msg = f"{custom_message}\nPoints added: {points}\nNew balance: {new_balance} points."
+    else:
+        msg = f"You have been lent {points} points. Your new balance is {new_balance} points."
     try:
         bot_instance.send_message(user_id, msg)
     except Exception as e:
         print(f"Error sending message to user {user_id}: {e}")
-    return f"{points} points have been added to user {user_id}. New balance: {new_balance} points."
+    return msg
+
 
 
 
