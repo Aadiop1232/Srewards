@@ -117,12 +117,12 @@ def gen_command(message):
     generated = []
     if key_type == "normal":
         for _ in range(qty):
-            key = generate_normal_key() 
+            key = generate_normal_key()
             add_key(key, "normal", 15)
             generated.append(key)
     elif key_type == "premium":
         for _ in range(qty):
-            key = generate_premium_key() 
+            key = generate_premium_key()
             add_key(key, "premium", 90)
             generated.append(key)
     else:
@@ -158,7 +158,7 @@ def callback_menu(call):
         send_rewards_menu(bot, call.message)
     elif call.data == "menu_info":
         from handlers.account_info import send_account_info
-        send_account_info(bot, call.message)
+        send_account_info(bot, call)
     elif call.data == "menu_referral":
         from handlers.referral import send_referral_menu
         send_referral_menu(bot, call.message)
