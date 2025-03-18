@@ -1,5 +1,5 @@
-TOKEN = "7760154469:AAFwBrol9EP2L78Wt0sTqXcoz3OiL4HPy8I"
-BOT_USERNAME = "ShadowRewardsBot"  # without the '@' symbol
+TOKEN = "7760154469:AAGWCGWkfiA7mAWPekBRT8s2vfSeba0fRtA"
+BOT_USERNAME = "ShadowRewardsBot"
 
 REQUIRED_CHANNELS = [
     "https://t.me/shadowsquad0",
