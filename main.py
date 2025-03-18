@@ -1,6 +1,8 @@
 import telebot
 import config
 import os
+import threading
+import time
 from datetime import datetime
 from db import init_db, add_user, get_user, claim_key_in_db, DATABASE
 from handlers.verification import send_verification_message, handle_verification_callback
@@ -15,7 +17,7 @@ from handlers.logs import log_event
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
 init_db()
 
-# /recover command: reply to a document to update the bot's database
+# /recover command: updates the current database with a replied document.
 @bot.message_handler(commands=['recover'])
 def recover_command(message):
     if not message.reply_to_message or not message.reply_to_message.document:
@@ -33,6 +35,20 @@ def recover_command(message):
         bot.reply_to(message, "Database recovered successfully!")
     except Exception as e:
         bot.reply_to(message, f"Error recovering database: {e}")
+
+# Daily backup thread: every 24 hours, the bot sends a copy of bot.db to each owner.
+def daily_backup():
+    while True:
+        time.sleep(86400)  # 86400 seconds = 24 hours
+        try:
+            with open(DATABASE, "rb") as f:
+                backup_file = f.read()
+            for owner in config.OWNERS:
+                bot.send_document(owner, ("bot_backup.db", backup_file))
+        except Exception as e:
+            print(f"Error during daily backup: {e}")
+
+threading.Thread(target=daily_backup, daemon=True).start()
 
 def check_if_banned(message):
     user = get_user(str(message.from_user.id))
@@ -253,5 +269,4 @@ while True:
             bot.send_message(config.LOGS_CHANNEL, f"Polling error: {e}")
         except Exception:
             pass
-        import time
         time.sleep(15)
