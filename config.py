@@ -6,6 +6,7 @@ REQUIRED_CHANNELS = [
     "https://t.me/Originlabs",
     "https://t.me/ShadowsquadHits",
     "https://t.me/Binhub_Originlabs"
+    "https://t.me/ShadowSquadReward"
 ]
 
 
