@@ -59,8 +59,7 @@ def lend_command(message):
     custom_message = " ".join(parts[3:]) if len(parts) > 3 else None
     result = lend_points(str(message.from_user.id), user_id, points, custom_message)
     bot.reply_to(message, result)
-    log_event(bot, "lend", f"Admin {message.from_user.id} lent {points} points to user {user_id}.",
-            user=message.from_user)
+    log_event(bot, "lend", f"Admin {message.from_user.id} lent {points} points to user {user_id}.", user=message.from_user)
 
 @bot.message_handler(commands=["redeem"])
 def redeem_command(message):
@@ -74,15 +73,13 @@ def redeem_command(message):
     key = parts[1].strip()
     result = claim_key_in_db(key, user_id)
     bot.reply_to(message, result)
-    log_event(bot, "key_claim", f"User {user_id} redeemed key {key}. Result: {result}",
-            user=message.from_user)
+    log_event(bot, "key_claim", f"User {user_id} redeemed key {key}. Result: {result}", user=message.from_user)
 
 @bot.message_handler(commands=["report"])
 def report_command(message):
     if check_if_banned(message):
         return
-    msg = bot.send_message(message.chat.id,
-                           "📝 Please type your report message (you may attach a photo or document):")
+    msg = bot.send_message(message.chat.id, "📝 Please type your report message (you may attach a photo or document):")
     bot.register_next_step_handler(msg, lambda m: process_report(bot, m))
 
 @bot.message_handler(commands=["tutorial"])
@@ -182,8 +179,7 @@ def callback_menu(call):
         from handlers.review import prompt_review
         prompt_review(bot, call.message)
     elif call.data == "menu_report":
-        msg = bot.send_message(call.message.chat.id,
-                               "📝 Please type your report message (you may attach a photo or document):")
+        msg = bot.send_message(call.message.chat.id, "📝 Please type your report message (you may attach a photo or document):")
         bot.register_next_step_handler(msg, lambda m: process_report(bot, m))
     elif call.data == "menu_support":
         from handlers.support import send_support_message
@@ -214,9 +210,8 @@ def callback_claim(call):
     claim_account(bot, call, platform_name)
 
 @bot.message_handler(func=lambda message: message.reply_to_message and 
-                     message.reply_to_message.message_id in __import__('handlers.review').REPORT_MAPPING)
+                     message.reply_to_message.message_id in REPORT_MAPPING)
 def relay_report_reply(message):
-    from handlers.review import REPORT_MAPPING
     original_chat = REPORT_MAPPING[message.reply_to_message.message_id]
     bot.send_message(original_chat, f"Reply from Admin: {message.text}")
 
