@@ -2,12 +2,8 @@ from db import get_user, add_user
 from datetime import datetime
 
 def send_account_info(bot, update):
-    if hasattr(update, "data"):
-        chat_id = update.message.chat.id
-        user_obj = update.from_user
-    else:
-        chat_id = update.chat.id
-        user_obj = update.from_user
+    user_obj = update.from_user
+    chat_id = update.message.chat.id if (hasattr(update, "message") and update.message) else user_obj.id
     telegram_id = str(user_obj.id)
     user = get_user(telegram_id)
     if not user:
