@@ -4,13 +4,11 @@ from datetime import datetime
 from db import init_db, add_user, get_user, claim_key_in_db
 from handlers.verification import send_verification_message, handle_verification_callback
 from handlers.main_menu import send_main_menu
-from handlers.referral import extract_referral_code  # Removed process_verified_referral call here
+from handlers.referral import extract_referral_code
 from handlers.rewards import send_rewards_menu, handle_platform_selection, claim_account
 from handlers.review import prompt_review, process_report
 from handlers.account_info import send_account_info
-from handlers.admin import (send_admin_menu, admin_callback_handler, is_admin, lend_points, 
-                            update_account_claim_cost, update_referral_bonus, 
-                            generate_normal_key, generate_premium_key, add_key)
+from handlers.admin import send_admin_menu, admin_callback_handler, is_admin, lend_points, generate_normal_key, generate_premium_key, add_key
 from handlers.logs import log_event
 
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
@@ -27,20 +25,13 @@ def check_if_banned(message):
 def start_command(message):
     if check_if_banned(message):
         return
-    print(f"[DEBUG] /start received from user: {message.from_user.id}")
     user_id = str(message.from_user.id)
     user = get_user(user_id)
     pending_ref = extract_referral_code(message)
     if not user:
-        add_user(
-            user_id,
-            message.from_user.username or message.from_user.first_name,
-            datetime.now().strftime("%Y-%m-%d"),
-            pending_referrer=pending_ref
-        )
+        add_user(user_id, message.from_user.username or message.from_user.first_name, datetime.now().strftime("%Y-%m-%d"), pending_referrer=pending_ref)
         user = get_user(user_id)
-    # Removed immediate referral bonus processing from here.
-    if is_admin(get_user(user_id)):
+    if is_admin(user):
         bot.send_message(message.chat.id, "✨ Welcome, Admin/Owner! You are automatically verified! ✨")
         send_main_menu(bot, message)
         return
@@ -100,7 +91,7 @@ def tutorial_command(message):
         "2. To claim an account, go to the Rewards section.\n"
         "3. Earn more points by referrals or redeeming keys.\n"
         "4. Use the Report button to report issues.\n"
-        "5. Daily check-ins and missions (if implemented) offer bonus points.\n"
+        "5. Daily check-ins and missions offer bonus points.\n"
         "Admins can generate keys with /gen, lend points with /lend, and adjust pricing with /Uprice and /Rpoints.\n"
         "Enjoy and good luck! 😊"
     )
@@ -141,7 +132,6 @@ def gen_command(message):
         text = "Redeem Generated ✅\n"
         for key in generated:
             text += f"➔ <code>{key}</code>\n"
-        # Updated instruction text to avoid HTML parsing issues
         text += "\nYou can redeem this code using this command: /redeem KEY"
     else:
         text = "No keys generated."
@@ -149,10 +139,7 @@ def gen_command(message):
 
 @bot.callback_query_handler(func=lambda call: call.data == "back_main")
 def callback_back_main(call):
-    try:
-        bot.delete_message(call.message.chat.id, call.message.message_id)
-    except Exception as e:
-        print("Error deleting message:", e)
+    bot.answer_callback_query(call.id)
     from handlers.main_menu import send_main_menu
     send_main_menu(bot, call.message)
 
@@ -192,9 +179,9 @@ def callback_menu(call):
 
 @bot.callback_query_handler(func=lambda call: call.data == "get_ref_link")
 def callback_get_ref_link(call):
+    bot.answer_callback_query(call.id, "Generating referral link...")
     from handlers.referral import get_referral_link
     referral_link = get_referral_link(str(call.from_user.id))
-    bot.answer_callback_query(call.id, "Referral link generated!")
     bot.send_message(call.message.chat.id, f"Your referral link:\n{referral_link}")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("reward_"))
