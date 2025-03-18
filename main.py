@@ -6,7 +6,7 @@ from handlers.verification import send_verification_message, handle_verification
 from handlers.main_menu import send_main_menu
 from handlers.referral import extract_referral_code
 from handlers.rewards import send_rewards_menu, handle_platform_selection, claim_account
-from handlers.review import prompt_review, process_report
+from handlers.review import prompt_review, process_report, REPORT_MAPPING
 from handlers.account_info import send_account_info
 from handlers.admin import send_admin_menu, admin_callback_handler, is_admin, lend_points, generate_normal_key, generate_premium_key, add_key
 from handlers.logs import log_event
@@ -29,7 +29,8 @@ def start_command(message):
     user = get_user(user_id)
     pending_ref = extract_referral_code(message)
     if not user:
-        add_user(user_id, message.from_user.username or message.from_user.first_name, datetime.now().strftime("%Y-%m-%d"), pending_referrer=pending_ref)
+        add_user(user_id, message.from_user.username or message.from_user.first_name,
+                 datetime.now().strftime("%Y-%m-%d"), pending_referrer=pending_ref)
         user = get_user(user_id)
     if is_admin(user):
         bot.send_message(message.chat.id, "✨ Welcome, Admin/Owner! You are automatically verified! ✨")
@@ -42,7 +43,7 @@ def start_command(message):
 def lend_command(message):
     if check_if_banned(message):
         return
-    if str(message.from_user.id) not in config.OWNERS:
+    if str(message.from_user.id) not in config.ADMINS and str(message.from_user.id) not in config.OWNERS:
         bot.reply_to(message, "🚫 You don't have permission to use this command.")
         return
     parts = message.text.strip().split()
@@ -58,7 +59,8 @@ def lend_command(message):
     custom_message = " ".join(parts[3:]) if len(parts) > 3 else None
     result = lend_points(str(message.from_user.id), user_id, points, custom_message)
     bot.reply_to(message, result)
-    log_event(bot, "lend", f"Owner {message.from_user.id} lent {points} pts to user {user_id}.", user=message.from_user)
+    log_event(bot, "lend", f"Admin {message.from_user.id} lent {points} points to user {user_id}.",
+            user=message.from_user)
 
 @bot.message_handler(commands=["redeem"])
 def redeem_command(message):
@@ -72,13 +74,15 @@ def redeem_command(message):
     key = parts[1].strip()
     result = claim_key_in_db(key, user_id)
     bot.reply_to(message, result)
-    log_event(bot, "key_claim", f"User {user_id} redeemed key {key}. Result: {result}", user=message.from_user)
+    log_event(bot, "key_claim", f"User {user_id} redeemed key {key}. Result: {result}",
+            user=message.from_user)
 
 @bot.message_handler(commands=["report"])
 def report_command(message):
     if check_if_banned(message):
         return
-    msg = bot.send_message(message.chat.id, "📝 Please type your report message (you may attach a photo or document):")
+    msg = bot.send_message(message.chat.id,
+                           "📝 Please type your report message (you may attach a photo or document):")
     bot.register_next_step_handler(msg, lambda m: process_report(bot, m))
 
 @bot.message_handler(commands=["tutorial"])
@@ -139,9 +143,21 @@ def gen_command(message):
 
 @bot.callback_query_handler(func=lambda call: call.data == "back_main")
 def callback_back_main(call):
-    bot.answer_callback_query(call.id)
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception as e:
+        print("Error deleting message:", e)
     from handlers.main_menu import send_main_menu
     send_main_menu(bot, call.message)
+
+@bot.callback_query_handler(func=lambda call: call.data == "back_admin")
+def callback_back_admin(call):
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception as e:
+        print("Error deleting message:", e)
+    from handlers.admin import send_admin_menu
+    send_admin_menu(bot, call.message)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("verify"))
 def callback_verify(call):
@@ -166,7 +182,8 @@ def callback_menu(call):
         from handlers.review import prompt_review
         prompt_review(bot, call.message)
     elif call.data == "menu_report":
-        msg = bot.send_message(call.message.chat.id, "📝 Please type your report message (you may attach a photo or document):")
+        msg = bot.send_message(call.message.chat.id,
+                               "📝 Please type your report message (you may attach a photo or document):")
         bot.register_next_step_handler(msg, lambda m: process_report(bot, m))
     elif call.data == "menu_support":
         from handlers.support import send_support_message
@@ -195,6 +212,13 @@ def callback_claim(call):
     platform_name = call.data.split("claim_")[1]
     from handlers.rewards import claim_account
     claim_account(bot, call, platform_name)
+
+@bot.message_handler(func=lambda message: message.reply_to_message and 
+                     message.reply_to_message.message_id in __import__('handlers.review').REPORT_MAPPING)
+def relay_report_reply(message):
+    from handlers.review import REPORT_MAPPING
+    original_chat = REPORT_MAPPING[message.reply_to_message.message_id]
+    bot.send_message(original_chat, f"Reply from Admin: {message.text}")
 
 while True:
     try:
