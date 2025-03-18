@@ -18,7 +18,7 @@ def process_verified_referral(telegram_id, bot_instance):
         add_referral(referrer_id, user.get("telegram_id"))
         clear_pending_referral(str(telegram_id))
         try:
-            bot_instance.send_message(int(referrer_id), "🎉 Referral completed! You earned bonus points!", parse_mode="HTML")
+            bot_instance.send_message(int(referrer_id), "🎉 Referral completed! You earned 10 points!", parse_mode="HTML")
         except Exception as e:
             print(f"Error notifying referrer: {e}")
         log_event(bot_instance, "referral", f"User {referrer_id} referred user {user.get('telegram_id')}.")
