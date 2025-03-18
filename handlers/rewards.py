@@ -1,4 +1,3 @@
-# handlers/rewards.py
 import telebot
 from telebot import types
 import random
@@ -20,14 +19,14 @@ def send_rewards_menu(bot, message):
         price = platform.get("price") or get_account_claim_cost()
         btn_text = f"{platform_name} | Stock: {len(stock)} | Price: {price} pts"
         markup.add(types.InlineKeyboardButton(btn_text, callback_data=f"reward_{platform_name}"))
-    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
+    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="menu_rewards"))
     try:
-        bot.edit_message_text("<b>🎯 Available Platforms 🎯</b>", 
+        bot.edit_message_text("<b>🎯 Available Platforms 🎯</b>",
                               chat_id=message.chat.id,
-                              message_id=message.message_id, 
+                              message_id=message.message_id,
                               parse_mode="HTML", reply_markup=markup)
     except Exception:
-        bot.send_message(message.chat.id, "<b>🎯 Available Platforms 🎯</b>", 
+        bot.send_message(message.chat.id, "<b>🎯 Available Platforms 🎯</b>",
                          parse_mode="HTML", reply_markup=markup)
 
 def handle_platform_selection(bot, call, platform_name):
@@ -52,29 +51,28 @@ def handle_platform_selection(bot, call, platform_name):
         markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="menu_rewards"))
     try:
-        bot.edit_message_text(text, 
+        bot.edit_message_text(text,
                               chat_id=call.message.chat.id,
-                              message_id=call.message.message_id, 
+                              message_id=call.message.message_id,
                               parse_mode="HTML", reply_markup=markup)
     except Exception:
         bot.send_message(call.message.chat.id, text, parse_mode="HTML", reply_markup=markup)
 
 def send_premium_account_info(bot, chat_id, platform_name, account_info):
-    text = f"""🎉✨ 𝗣𝗥𝗘𝗠𝗜𝗨𝗠 𝗔𝗖𝗖𝗢𝗨𝗡𝗧 𝗨𝗡𝗟𝗢𝗖𝗞𝗘𝗗 
+    text = f"""🎉✨ PREMIUM ACCOUNT UNLOCKED 
 
-✨🎉📦 𝗦𝗲𝗿𝘃𝗶𝗰𝗲: {platform_name}
+✨🎉📦 Service: {platform_name}
 
-🔑 𝗬𝗼𝘂𝗿 𝗔𝗰𝗰𝗼𝘂𝗻𝘁: 
+🔑 Your Account: 
 <code>{account_info}</code> 📌 
 
-𝗛𝗼𝘄 𝘁𝗼 𝗹𝗼𝗴𝗶𝗻:
+How to login:
 1️⃣ Copy the details
 2️⃣ Open app/website
 3️⃣ Paste & login
 
-❌ 𝗔𝗰𝗰𝗼𝘂𝗻𝘁 𝗻𝗼𝘁 𝘄𝗼𝗿𝗸𝗶𝗻𝗴? 𝗥𝗲𝗽𝗼𝗿𝘁 𝗯𝗲𝗹𝗼𝘄 𝘁𝗼 𝗴𝗲𝘁 𝗮 𝗿𝗲𝗳𝘂𝗻𝗱 𝗼𝗳 𝘆𝗼𝘂𝗿 𝗽𝗼𝗶𝗻𝘁𝘀!
+❌ Account not working? Report below to get a refund of your points!
 By @shadowsquad0"""
-    # Create an inline keyboard with a Report button.
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("Report", callback_data="menu_report"))
     bot.send_message(chat_id, text, parse_mode="HTML", reply_markup=markup)
@@ -113,9 +111,11 @@ def claim_account(bot, call, platform_name):
     from db import update_stock_for_platform
     update_stock_for_platform(platform_name, stock)
     new_points = current_points - price
+    from db import update_user_points
     update_user_points(user_id, new_points)
     log_event(bot, "account_claim", f"User {user_id} claimed an account from {platform_name}. New balance: {new_points} pts.")
-    
-    # Send the formatted premium account info with a report button
-    send_premium_account_info(bot, call.message.chat.id, platform_name, account)
-    
+    # Ensure that if the command is triggered in a group, the sensitive info is sent privately.
+    chat_id = call.message.chat.id
+    if call.message.chat.type != "private":
+        chat_id = call.from_user.id
+    send_premium_account_info(bot, chat_id, platform_name, account)
