@@ -89,7 +89,6 @@ def init_db():
     conn.commit()
     c.close()
     conn.close()
-    # Ensure the 'verified' column exists in the users table
     add_verified_column()
 
 def add_verified_column():
@@ -148,9 +147,7 @@ def add_user(telegram_id, username, join_date, pending_referrer=None):
     c.execute("SELECT * FROM users WHERE telegram_id = ?", (telegram_id,))
     user = c.fetchone()
     if not user:
-        c.execute("""
-            INSERT INTO users (telegram_id, username, join_date, pending_referrer)
-            VALUES (?, ?, ?, ?) """, (telegram_id, username, join_date, pending_referrer))
+        c.execute("INSERT INTO users (telegram_id, username, join_date, pending_referrer) VALUES (?, ?, ?, ?)", (telegram_id, username, join_date, pending_referrer))
         conn.commit()
     c.close()
     conn.close()
@@ -197,7 +194,7 @@ def add_referral(referrer_id, referred_id):
     if not c.fetchone():
         c.execute("INSERT INTO referrals (user_id, referred_id) VALUES (?, ?)", (referrer_id, referred_id))
         conn.commit()
-        bonus = get_referral_bonus()
+        bonus = 10
         c.execute("UPDATE users SET points = points + ?, referrals = referrals + 1 WHERE telegram_id = ?", (bonus, referrer_id))
         conn.commit()
     c.close()
@@ -262,8 +259,7 @@ def claim_key_in_db(key_str, telegram_id):
         conn.close()
         return "Key already claimed."
     points_awarded = key_doc["points"]
-    c.execute("UPDATE keys SET claimed = 1, claimed_by = ?, timestamp = ? WHERE \"key\" = ?",
-              (telegram_id, datetime.now(), key_str))
+    c.execute("UPDATE keys SET claimed = 1, claimed_by = ?, timestamp = ? WHERE \"key\" = ?", (telegram_id, datetime.now(), key_str))
     conn.commit()
     c.execute("UPDATE users SET points = points + ? WHERE telegram_id = ?", (points_awarded, telegram_id))
     conn.commit()
@@ -274,8 +270,7 @@ def claim_key_in_db(key_str, telegram_id):
 def add_key(key_str, key_type, points):
     conn = get_connection()
     c = conn.cursor()
-    c.execute("INSERT INTO keys (\"key\", type, points, claimed, claimed_by, timestamp) VALUES (?, ?, ?, 0, NULL, ?)",
-              (key_str, key_type, points, datetime.now()))
+    c.execute("INSERT INTO keys (\"key\", type, points, claimed, claimed_by, timestamp) VALUES (?, ?, ?, 0, NULL, ?)", (key_str, key_type, points, datetime.now()))
     conn.commit()
     c.close()
     conn.close()
