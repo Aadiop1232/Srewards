@@ -9,7 +9,7 @@ from handlers.verification import send_verification_message, handle_verification
 from handlers.main_menu import send_main_menu
 from handlers.referral import extract_referral_code
 from handlers.rewards import send_rewards_menu, handle_platform_selection, claim_account
-from handlers.review import prompt_review, process_report, REPORT_MAPPING
+from handlers.review import prompt_review, process_report, REPORT_MAPPING, handle_report_callback
 from handlers.account_info import send_account_info
 from handlers.admin import send_admin_menu, admin_callback_handler, is_admin, lend_points, generate_normal_key, generate_premium_key, add_key
 from handlers.logs import log_event
@@ -17,8 +17,7 @@ from handlers.logs import log_event
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
 init_db()
 
-# ------------------------------
-# /recover command: update current DB from replied file
+# /recover command: reply to a file to recover the database
 @bot.message_handler(commands=['recover'])
 def recover_command(message):
     if not message.reply_to_message or not message.reply_to_message.document:
@@ -37,8 +36,7 @@ def recover_command(message):
     except Exception as e:
         bot.reply_to(message, f"Error recovering database: {e}")
 
-# ------------------------------
-# Daily backup thread: every 24 hours, send bot.db to all owners
+# Daily backup: send bot.db to all owners every 24 hours.
 def daily_backup():
     while True:
         time.sleep(86400)  # 24 hours
@@ -52,20 +50,18 @@ def daily_backup():
 
 threading.Thread(target=daily_backup, daemon=True).start()
 
-# ------------------------------
-# Broadcast command: only owners can use this; sends a message to all users.
+# /broadcast command: owners can send a broadcast message to all users.
 @bot.message_handler(commands=["broadcast"])
 def broadcast_command(message):
     if str(message.from_user.id) not in config.OWNERS:
         bot.reply_to(message, "You are not authorized to use this command.")
         return
-    # Get text after /broadcast command
     parts = message.text.split(maxsplit=1)
     if len(parts) < 2:
         bot.reply_to(message, "Usage: /broadcast <message>")
         return
     broadcast_text = parts[1]
-    users = get_all_users()  # Function from admin module (or implement similarly in db.py)
+    users = get_all_users()
     sent = 0
     for user in users:
         try:
@@ -75,7 +71,6 @@ def broadcast_command(message):
             print(f"Error broadcasting to {user.get('telegram_id')}: {e}")
     bot.reply_to(message, f"Broadcast sent to {sent} users.")
 
-# ------------------------------
 def check_if_banned(message):
     user = get_user(str(message.from_user.id))
     if user and user.get("banned", 0):
@@ -186,7 +181,6 @@ def gen_command(message):
     except ValueError:
         bot.reply_to(message, "Quantity must be a number.")
         return
-    # Allow an optional points parameter; if not provided, use defaults.
     if len(parts) >= 4:
         try:
             key_points = int(parts[3])
@@ -217,6 +211,13 @@ def gen_command(message):
     else:
         text = "No keys generated."
     bot.reply_to(message, text, parse_mode="HTML")
+
+# Callback query handlers
+
+@bot.callback_query_handler(func=lambda call: call.data in ["claim_report", "close_report"])
+def callback_report(call):
+    from handlers.review import handle_report_callback
+    handle_report_callback(bot, call)
 
 @bot.callback_query_handler(func=lambda call: call.data == "back_main")
 def callback_back_main(call):
@@ -289,6 +290,7 @@ def callback_claim(call):
     from handlers.rewards import claim_account
     claim_account(bot, call, platform_name)
 
+# Message handler for report replies (live chat)
 @bot.message_handler(func=lambda message: message.reply_to_message and 
                      message.reply_to_message.message_id in REPORT_MAPPING)
 def relay_report_reply(message):
