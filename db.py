@@ -322,6 +322,25 @@ def get_platforms():
     conn.close()
     return [dict(p) for p in platforms]
 
+def add_stock_to_platform(platform_name, accounts):
+    """
+    Insert 'accounts' (list of strings) into the 'stock' array for the given platform.
+    """
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT stock FROM platforms WHERE platform_name = ?", (platform_name,))
+    row = c.fetchone()
+    current_stock = json.loads(row["stock"]) if row and row["stock"] else []
+    new_stock = current_stock + accounts
+    c.execute("UPDATE platforms SET stock = ? WHERE platform_name = ?", (json.dumps(new_stock), platform_name))
+    conn.commit()
+    c.close()
+    conn.close()
+    log_event(telebot.TeleBot(config.TOKEN), "STOCK",
+              f"[STOCK] Stock updated for Platform '{platform_name}'; added {len(accounts)} items.")
+    return f"Stock updated with {len(accounts)} items."
+
 def update_stock_for_platform(platform_name, stock):
     conn = get_connection()
     c = conn.cursor()
@@ -329,7 +348,8 @@ def update_stock_for_platform(platform_name, stock):
     conn.commit()
     c.close()
     conn.close()
-    log_event(telebot.TeleBot(config.TOKEN), "STOCK", f"[STOCK] Platform '{platform_name}' stock updated to {len(stock)} items.")
+    log_event(telebot.TeleBot(config.TOKEN), "STOCK",
+              f"[STOCK] Platform '{platform_name}' stock updated to {len(stock)} items.")
 
 def get_all_users():
     conn = get_connection()
