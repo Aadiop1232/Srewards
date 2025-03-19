@@ -21,7 +21,7 @@ def process_review(message, bot):
                 f"📢 Review from {message.from_user.username or message.from_user.first_name} ({message.from_user.id}):\n\n{review_text}",
                 parse_mode="Markdown"
             )
-            # Save mapping if you want to support live chat replies for reviews as well
+            # Save mapping if you want to support live chat replies for reviews
             REPORT_MAPPING[forwarded.message_id] = message.chat.id
         except Exception as e:
             print(f"Error sending review to owner {owner}: {e}")
@@ -42,14 +42,12 @@ def process_report(message, bot):
     username = user.username if user.username else user.first_name
     report_header = f"📣 Report from {username} ({user.id}):\n\n"
 
-    # Build inline keyboard with report action buttons
     markup = telebot.types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         telebot.types.InlineKeyboardButton("Claim Report", callback_data="claim_report"),
         telebot.types.InlineKeyboardButton("Close Report", callback_data="close_report")
     )
 
-    # Forward the report to all owners
     for owner in config.OWNERS:
         try:
             if message.content_type == "photo":
