@@ -1,7 +1,8 @@
 import time
 import config
 from telebot import types
-from main_menu import send_main_menu
+from handlers.main_menu import send_main_menu
+
 
 def check_channel_membership(bot, user_id):
     for channel in config.REQUIRED_CHANNELS:
