@@ -1,50 +1,67 @@
-import telebot
-from telebot import types
+import time
 import config
-from handlers.admin import is_admin
-from handlers.main_menu import send_main_menu
+from telebot import types
+from main_menu import send_main_menu
 
 def check_channel_membership(bot, user_id):
     for channel in config.REQUIRED_CHANNELS:
         try:
-            channel_username = channel.rstrip('/').split("/")[-1]
-            chat = bot.get_chat("@" + channel_username)
+            chan_name = channel.rstrip('/').split("/")[-1]
+            chat = bot.get_chat("@" + chan_name)
+
+            # if the bot isn't at least a member
             bot_member = bot.get_chat_member(chat.id, bot.get_me().id)
-            if bot_member.status not in ["administrator", "creator"]:
-                print(f"Bot is not admin in {channel}")
+            if bot_member.status not in ["member", "administrator", "creator"]:
                 return False
+
             user_member = bot.get_chat_member(chat.id, user_id)
-            print(f"User {user_id} membership in {channel}: {user_member.status}")
-            if user_member.status not in ["member", "creator", "administrator"]:
+            if user_member.status not in ["member", "administrator", "creator"]:
                 return False
         except Exception as e:
-            print(f"Error checking membership for {channel}: {e}")
+            print(f"Error checking membership in {channel}: {e}")
             return False
     return True
 
+def make_progress_bar(percentage, length=10):
+    filled = int(percentage * length // 100)
+    bar = "█" * filled + "░" * (length - filled)
+    return f"[{bar}]"
+
 def send_verification_message(bot, message):
-    if is_admin(message.from_user):
-        bot.send_message(message.chat.id, "✨ Welcome, Admin/Owner! You are automatically verified! ✨")
-        send_main_menu(bot, message)
-        return
+    verifying_msg = bot.send_message(message.chat.id, "⏳ Checking membership...")
+
+    for step in [25, 50, 75, 100]:
+        time.sleep(1)
+        bar = make_progress_bar(step, length=10)
+        try:
+            bot.edit_message_text(
+                f"⏳ Verifying channels...\n{bar}  {step}%",
+                chat_id=verifying_msg.chat.id,
+                message_id=verifying_msg.message_id
+            )
+        except Exception as e:
+            print(f"Error editing verification bar: {e}")
+
     if check_channel_membership(bot, message.from_user.id):
-        bot.send_message(message.chat.id, "✅ You are verified! 🎉")
+        try:
+            bot.edit_message_text("✅ You are verified! 🎉",
+                                  chat_id=verifying_msg.chat.id,
+                                  message_id=verifying_msg.message_id)
+        except:
+            bot.send_message(message.chat.id, "✅ You are verified! 🎉")
         send_main_menu(bot, message)
     else:
-        text = "🚫 You are not verified! Please join the following channels to use this bot:"
-        markup = types.InlineKeyboardMarkup(row_width=2)
-        for channel in config.REQUIRED_CHANNELS:
-            channel_username = channel.rstrip('/').split("/")[-1]
-            btn = types.InlineKeyboardButton(text=f"👉 {channel_username}", url=channel)
-            markup.add(btn)
-        markup.add(types.InlineKeyboardButton("✅ Verify", callback_data="verify"))
-        bot.send_message(message.chat.id, text, reply_markup=markup)
+        fail_text = "🚫 You are not verified!\nPlease join the required channels first."
+        try:
+            bot.edit_message_text(fail_text,
+                                  chat_id=verifying_msg.chat.id,
+                                  message_id=verifying_msg.message_id)
+        except:
+            bot.send_message(message.chat.id, fail_text)
 
 def handle_verification_callback(bot, call):
     if check_channel_membership(bot, call.from_user.id):
-        from handlers.referral import process_verified_referral
-        process_verified_referral(call.from_user.id, bot)
-        bot.answer_callback_query(call.id, "✅ Verification successful! 🎉")
+        bot.answer_callback_query(call.id, "✅ Verified!")
         send_main_menu(bot, call.message)
     else:
-        bot.answer_callback_query(call.id, "🚫 Verification failed. Please join all channels and try again.")
+        bot.answer_callback_query(call.id, "🚫 Not verified. Join channels first.")
