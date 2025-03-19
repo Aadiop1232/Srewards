@@ -1,6 +1,6 @@
 from telebot import types
 from db import get_user
-from admin import is_admin
+from handlers.admin import is_admin
 
 def send_main_menu(bot, update):
     """
