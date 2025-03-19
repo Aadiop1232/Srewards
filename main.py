@@ -6,81 +6,38 @@ import os
 import threading
 import time
 from datetime import datetime
-from db import init_db, add_user, get_user, claim_key_in_db, DATABASE, get_all_users
+from db import (
+    init_db, add_user, get_user, claim_key_in_db,
+    get_all_users, DATABASE
+)
 from handlers.verification import send_verification_message
 from handlers.main_menu import send_main_menu
 from handlers.referral import extract_referral_code
 from handlers.rewards import send_rewards_menu, handle_platform_selection, claim_account
-from handlers.review import prompt_review, process_report, REPORT_MAPPING, handle_report_callback
+from handlers.review import (
+    prompt_review, process_report,
+    REPORT_MAPPING, handle_report_callback
+)
 from handlers.account_info import send_account_info
-from handlers.admin import send_admin_menu, admin_callback_handler, is_admin, lend_points, generate_normal_key, generate_premium_key, add_key
+from handlers.admin import (
+    send_admin_menu, admin_callback_handler, is_admin,
+    lend_points, generate_normal_key, generate_premium_key, add_key
+)
 from handlers.logs import log_event
 
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
+
+# Initialize the database when the bot starts
 init_db()
 
-def check_if_banned(message):
-    user = get_user(str(message.from_user.id))
-    if user and user.get("banned", 0):
-        bot.send_message(message.chat.id, "🚫 You are banned and cannot use this bot.")
-        return True
-    return False
-
-@bot.message_handler(commands=["start"])
-def start_command(message):
-    if check_if_banned(message):
-        return
-    user_id = str(message.from_user.id)
-    user = get_user(user_id)
-    pending_ref = extract_referral_code(message)
-
-    # Register a new user if not already present
-    if not user:
-        add_user(
-            user_id,
-            message.from_user.username or message.from_user.first_name,
-            datetime.now().strftime("%Y-%m-%d"),
-            pending_referrer=pending_ref
-        )
-        user = get_user(user_id)
-
-    # If user is admin/owner, automatically verified
-    if is_admin(user):
-        bot.send_message(message.chat.id, "✨ Welcome, Admin/Owner! You are automatically verified! ✨")
-        send_main_menu(bot, message)
-        return
-
-    # --- Show a loading (progress) bar for normal users ---
-    msg = bot.send_message(message.chat.id, "⏳ Starting verification ...")
-    for i in range(1, 11):
-        progress_bar = "▰" * i + "▱" * (10 - i)
-        percent = i * 10
-        text = f"{progress_bar} {percent}%\n⏳ Verifying your channel membership, please wait..."
-        time.sleep(0.3)
-        bot.edit_message_text(text, message.chat.id, msg.message_id)
-
-    # After the loading bar, proceed with channel membership verification
-    send_verification_message(bot, message)
-
-@bot.message_handler(commands=['recover'])
-def recover_command(message):
-    if not message.reply_to_message or not message.reply_to_message.document:
-        bot.reply_to(message, "Please reply to a database file (document) with /recover command.")
-        return
-    if str(message.from_user.id) not in config.OWNERS:
-        bot.reply_to(message, "You do not have permission to perform this action.")
-        return
-    try:
-        file_id = message.reply_to_message.document.file_id
-        file_info = bot.get_file(file_id)
-        downloaded_file = bot.download_file(file_info.file_path)
-        with open(DATABASE, "wb") as f:
-            f.write(downloaded_file)
-        bot.reply_to(message, "Database recovered successfully!")
-    except Exception as e:
-        bot.reply_to(message, f"Error recovering database: {e}")
+#########################
+# Daily Backup Thread
+#########################
 
 def daily_backup():
+    """
+    Every 24 hours, read the DB file and send it to the owners as a backup.
+    """
     while True:
         time.sleep(86400)  # 24 hours
         try:
@@ -93,112 +50,267 @@ def daily_backup():
 
 threading.Thread(target=daily_backup, daemon=True).start()
 
+#########################
+# Helper: Banned Check
+#########################
+
+def check_if_banned(message):
+    user = get_user(str(message.from_user.id))
+    if user and user.get("banned", 0):
+        bot.send_message(message.chat.id, "🚫 You are banned and cannot use this bot.")
+        return True
+    return False
+
+#########################
+# /start Command
+#########################
+
+@bot.message_handler(commands=["start"])
+def start_command(message):
+    if check_if_banned(message):
+        return
+
+    user_id = str(message.from_user.id)
+    user = get_user(user_id)
+    pending_ref = extract_referral_code(message)
+
+    # If user doesn't exist in DB, create them
+    if not user:
+        add_user(
+            user_id,
+            message.from_user.username or message.from_user.first_name,
+            datetime.now().strftime("%Y-%m-%d"),
+            pending_referrer=pending_ref
+        )
+        user = get_user(user_id)
+
+    # If admin/owner, skip verification
+    if is_admin(user):
+        bot.send_message(message.chat.id, "✨ Welcome, Admin/Owner! You are automatically verified! ✨")
+        send_main_menu(bot, message)
+        return
+
+    # Show a 10-step loading bar before verifying channel membership
+    msg = bot.send_message(message.chat.id, "⏳ Starting verification...")
+    for i in range(1, 11):
+        progress_bar = "▰" * i + "▱" * (10 - i)
+        percent = i * 10
+        loading_text = f"{progress_bar} {percent}%\n⏳ Verifying your channel membership, please wait..."
+        time.sleep(0.3)
+        bot.edit_message_text(loading_text, message.chat.id, msg.message_id)
+
+    # Now do membership verification
+    send_verification_message(bot, message)
+
+#########################
+# /recover Command
+#########################
+
+@bot.message_handler(commands=['recover'])
+def recover_command(message):
+    """
+    Usage: reply to a .db file with /recover to overwrite the existing database.
+    Only owners can do this.
+    """
+    if not message.reply_to_message or not message.reply_to_message.document:
+        bot.reply_to(message, "Please reply to a database file (document) with /recover command.")
+        return
+    if str(message.from_user.id) not in config.OWNERS:
+        bot.reply_to(message, "You do not have permission to perform this action.")
+        return
+
+    try:
+        file_id = message.reply_to_message.document.file_id
+        file_info = bot.get_file(file_id)
+        downloaded_file = bot.download_file(file_info.file_path)
+        with open(DATABASE, "wb") as f:
+            f.write(downloaded_file)
+        bot.reply_to(message, "Database recovered successfully!")
+    except Exception as e:
+        bot.reply_to(message, f"Error recovering database: {e}")
+
+#########################
+# /get Command
+#########################
+
+@bot.message_handler(commands=["get"])
+def get_command(message):
+    """
+    Lets owners download the current DB file, 
+    so they can /recover it later if needed.
+    """
+    if str(message.from_user.id) not in config.OWNERS:
+        bot.reply_to(message, "You do not have permission to use this command.")
+        return
+    try:
+        with open(DATABASE, "rb") as f:
+            db_bytes = f.read()
+        bot.send_document(message.chat.id, ("bot.db", db_bytes))
+    except Exception as e:
+        bot.reply_to(message, f"Error sending database: {e}")
+
+#########################
+# /broadcast Command
+#########################
+
 @bot.message_handler(commands=["broadcast"])
 def broadcast_command(message):
+    """
+    Broadcast a message to all users in the DB. 
+    Usage: /broadcast <message>
+    """
     if str(message.from_user.id) not in config.OWNERS:
         bot.reply_to(message, "You are not authorized to use this command.")
         return
+
     parts = message.text.split(maxsplit=1)
     if len(parts) < 2:
         bot.reply_to(message, "Usage: /broadcast <message>")
         return
+
     broadcast_text = parts[1]
     users = get_all_users()
     sent = 0
-    for user in users:
+    for usr in users:
         try:
-            bot.send_message(user.get("telegram_id"), f"[BROADCAST]\n\n{broadcast_text}")
+            bot.send_message(usr.get("telegram_id"), f"[BROADCAST]\n\n{broadcast_text}")
             sent += 1
         except Exception as e:
-            print(f"Error broadcasting to {user.get('telegram_id')}: {e}")
+            print(f"Error broadcasting to {usr.get('telegram_id')}: {e}")
+
     bot.reply_to(message, f"Broadcast sent to {sent} users.")
+
+#########################
+# /lend Command
+#########################
 
 @bot.message_handler(commands=["lend"])
 def lend_command(message):
     if check_if_banned(message):
         return
+
     if message.chat.type != "private":
         bot.send_message(message.from_user.id, "Please use the /lend command in a private chat.")
         return
-    if str(message.from_user.id) not in config.ADMINS and str(message.from_user.id) not in config.OWNERS:
+
+    if (str(message.from_user.id) not in config.ADMINS
+        and str(message.from_user.id) not in config.OWNERS):
         bot.reply_to(message, "🚫 You don't have permission to use this command.")
         return
+
     parts = message.text.strip().split()
     if len(parts) < 3:
         bot.reply_to(message, "Usage: /lend <user_id> <points> [custom message]", parse_mode="HTML")
         return
+
     user_id = parts[1]
     try:
         points = int(parts[2])
     except ValueError:
         bot.reply_to(message, "Points must be a number.")
         return
+
     custom_message = " ".join(parts[3:]) if len(parts) > 3 else None
     result = lend_points(str(message.from_user.id), user_id, points, custom_message)
     bot.reply_to(message, result)
-    log_event(bot, "LEND", f"[LEND] {message.from_user.username or message.from_user.first_name} ({message.from_user.id}) lent {points} points to user {user_id}.", user=message.from_user)
+    log_event(
+        bot, "LEND",
+        f"[LEND] {message.from_user.username or message.from_user.first_name} ({message.from_user.id}) lent {points} points to user {user_id}.",
+        user=message.from_user
+    )
+
+#########################
+# /redeem Command
+#########################
 
 @bot.message_handler(commands=["redeem"])
 def redeem_command(message):
     if check_if_banned(message):
         return
+
     if message.chat.type != "private":
         bot.send_message(message.from_user.id, "Please use the /redeem command in a private chat.")
         return
+
     user_id = str(message.from_user.id)
     parts = message.text.split()
     if len(parts) < 2:
         bot.reply_to(message, "Usage: /redeem <key>", parse_mode="HTML")
         return
+
     key = parts[1].strip()
     result = claim_key_in_db(key, user_id)
     bot.reply_to(message, result)
-    log_event(bot, "ACCOUNT_CLAIM", f"[ACCOUNT_CLAIM] {message.from_user.username or message.from_user.first_name} ({user_id}) redeemed key {key}. Result: {result}", user=message.from_user)
+    log_event(
+        bot, "ACCOUNT_CLAIM",
+        f"[ACCOUNT_CLAIM] {message.from_user.username or message.from_user.first_name} ({user_id}) redeemed key {key}. Result: {result}",
+        user=message.from_user
+    )
+
+#########################
+# /report Command
+#########################
 
 @bot.message_handler(commands=["report"])
 def report_command(message):
     if check_if_banned(message):
         return
+
     msg = bot.send_message(message.chat.id, "📝 Please type your report message (you may attach a photo or document):")
-    # Fix the argument order so (m) is first, then (bot)
+    # Next step must pass (message, bot) in that order
     bot.register_next_step_handler(msg, lambda m: process_report(m, bot))
+
+#########################
+# /tutorial Command
+#########################
 
 @bot.message_handler(commands=["tutorial"])
 def tutorial_command(message):
     if check_if_banned(message):
         return
+
     text = (
         "📖 Tutorial\n"
         "1. Every new user starts with 20 points.\n"
         "2. To claim an account, go to the Rewards section.\n"
         "3. Earn more points by referrals or redeeming keys.\n"
-        "4. Use the Report button to report any issues.\n"
+        "4. Use the Report button to report issues.\n"
         "5. Daily check-ins and missions offer bonus points.\n"
         "Admins can generate keys with /gen, lend points with /lend, etc.\n"
         "Enjoy and good luck! 😊"
     )
     bot.send_message(message.chat.id, text, parse_mode="HTML")
 
+#########################
+# /gen Command
+#########################
+
 @bot.message_handler(commands=["gen"])
 def gen_command(message):
     if check_if_banned(message):
         return
+
     if message.chat.type != "private":
         bot.send_message(message.from_user.id, "Please use the /gen command in a private chat.")
         return
-    if str(message.from_user.id) not in config.ADMINS and str(message.from_user.id) not in config.OWNERS:
+
+    if (str(message.from_user.id) not in config.ADMINS
+        and str(message.from_user.id) not in config.OWNERS):
         bot.reply_to(message, "🚫 You don't have permission to generate keys.")
         return
+
     parts = message.text.strip().split()
     if len(parts) < 3:
         bot.reply_to(message, "Usage: /gen <normal|premium> <quantity> [points]", parse_mode="HTML")
         return
+
     key_type = parts[1].lower()
     try:
         qty = int(parts[2])
     except ValueError:
         bot.reply_to(message, "Quantity must be a number.")
         return
+
     if len(parts) >= 4:
         try:
             key_points = int(parts[3])
@@ -224,17 +336,27 @@ def gen_command(message):
         return
 
     if generated:
-        text = "Redeem Generated ✅\n"
+        fancy_text = (
+            "╔═══━━━─── • ───━━━═══╗\n"
+            "     🎁 𝗦𝗛𝗔𝗗𝗢𝗪 𝗩𝟭 🎁\n"
+            "       ✨ Redeem Keys ✨\n"
+            "╚═══━━━─── • ───━━━═══╝\n"
+        )
         for key in generated:
-            text += f"➔ <code>{key}</code>\n"
-        text += "\nYou can redeem this code using this command: /redeem KEY"
+            fancy_text += f"⟡ {key}\n"
+        fancy_text += (
+            "╭─━━━━━━━━━━━━─╮\n"
+            "  🤖 Redeem your code:\n"
+            "   ➥ /redeem <KEY>\n"
+            "╰─━━━━━━━━━━━━─╯"
+        )
+        bot.reply_to(message, fancy_text, parse_mode="HTML")
     else:
-        text = "No keys generated."
-    bot.reply_to(message, text, parse_mode="HTML")
+        bot.reply_to(message, "No keys generated.")
 
-# ----------------
-# Callback handlers
-# ----------------
+#########################
+# Callback Handlers
+#########################
 
 @bot.callback_query_handler(func=lambda call: call.data in ["claim_report", "close_report"])
 def callback_report(call):
@@ -247,6 +369,7 @@ def callback_back_main(call):
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except Exception as e:
         print("Error deleting message:", e)
+
     from handlers.main_menu import send_main_menu
     send_main_menu(bot, call.message)
 
@@ -256,6 +379,7 @@ def callback_back_admin(call):
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except Exception as e:
         print("Error deleting message:", e)
+
     from handlers.admin import send_admin_menu
     send_admin_menu(bot, call.message)
 
@@ -270,6 +394,9 @@ def callback_admin(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("menu_"))
 def callback_menu(call):
+    """
+    Called for main menu items like 'menu_rewards', 'menu_info', 'menu_referral', etc.
+    """
     if call.data == "menu_rewards":
         send_rewards_menu(bot, call.message)
     elif call.data == "menu_info":
@@ -282,8 +409,8 @@ def callback_menu(call):
         from handlers.review import prompt_review
         prompt_review(bot, call.message)
     elif call.data == "menu_report":
-        msg = bot.send_message(call.message.chat.id, "📝 Please type your report message (you may attach a photo or document):")
-        # Fix the argument order again
+        msg = bot.send_message(call.message.chat.id,
+                               "📝 Please type your report message (you may attach a photo or document):")
         bot.register_next_step_handler(msg, lambda m: process_report(m, bot))
     elif call.data == "menu_support":
         from handlers.support import send_support_message
@@ -313,16 +440,26 @@ def callback_claim(call):
     from handlers.rewards import claim_account
     claim_account(bot, call, platform_name)
 
-# Relay the admin's reply to the user who reported
+#########################
+# Relay Admin's Reply
+#########################
+
 @bot.message_handler(func=lambda message: (
-    message.reply_to_message
-    and message.reply_to_message.message_id in REPORT_MAPPING
+    message.reply_to_message and
+    message.reply_to_message.message_id in REPORT_MAPPING
 ))
 def relay_report_reply(message):
+    """
+    When an admin replies to a forwarded user report, 
+    send that admin's text back to the original user.
+    """
     original_chat = REPORT_MAPPING[message.reply_to_message.message_id]
     bot.send_message(original_chat, f"Reply from Admin: {message.text}")
 
-# Main polling loop
+#########################
+# Main Polling
+#########################
+
 while True:
     try:
         bot.polling(none_stop=True)
