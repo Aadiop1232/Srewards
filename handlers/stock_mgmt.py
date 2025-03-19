@@ -9,10 +9,10 @@ import config
 from telebot import types
 from db import get_platforms, add_stock_to_platform, update_stock_for_platform
 from db import get_account_claim_cost
-# We no longer import log_event from db, we do logging from here if needed
 from handlers.logs import log_event
 
 def handle_platform_callback(bot, call):
+    print(f"[DEBUG handle_platform_callback] data='{call.data}', user_id={call.from_user.id}")
     bot.answer_callback_query(call.id, text="Platform mgmt loading...")
 
     markup = types.InlineKeyboardMarkup(row_width=2)
@@ -37,17 +37,20 @@ def handle_platform_callback(bot, call):
         bot.send_message(call.message.chat.id, "Platform Management Options:", reply_markup=markup)
 
 def handle_platform_add(bot, call):
+    print(f"[DEBUG handle_platform_add] data='{call.data}', user_id={call.from_user.id}")
     bot.answer_callback_query(call.id, text="Adding platform...")
     msg = bot.send_message(call.message.chat.id, "Please send the platform name to add (Account Platform):")
     bot.register_next_step_handler(msg, process_platform_add_account, bot)
 
 def process_platform_add_account(message, bot):
+    print(f"[DEBUG process_platform_add_account] text='{message.text}', from_user_id={message.from_user.id}")
     platform_name = message.text.strip()
     msg = bot.send_message(message.chat.id, f"Enter the price for platform '{platform_name}':")
     bot.register_next_step_handler(msg, process_platform_price, bot, platform_name)
 
 def process_platform_price(message, bot, platform_name):
     from db import add_platform
+    print(f"[DEBUG process_platform_price] text='{message.text}', user_id={message.from_user.id}, platform='{platform_name}'")
     try:
         price = int(message.text.strip())
     except ValueError:
@@ -60,18 +63,21 @@ def process_platform_price(message, bot, platform_name):
     send_admin_menu(bot, message)
 
 def handle_platform_add_cookie(bot, call):
+    print(f"[DEBUG handle_platform_add_cookie] data='{call.data}', user_id={call.from_user.id}")
     bot.answer_callback_query(call.id, text="Adding cookie platform...")
     msg = bot.send_message(call.message.chat.id, "Please send the platform name to add (Cookie Platform):")
     bot.register_next_step_handler(msg, process_platform_add_cookie, bot)
 
 def process_platform_add_cookie(message, bot):
     from db import add_cookie_platform
+    print(f"[DEBUG process_platform_add_cookie] text='{message.text}', user_id={message.from_user.id}")
     platform_name = message.text.strip()
     msg = bot.send_message(message.chat.id, f"Enter the price for cookie platform '{platform_name}':")
     bot.register_next_step_handler(msg, process_cookie_platform_price, bot, platform_name)
 
 def process_cookie_platform_price(message, bot, platform_name):
     from db import add_cookie_platform
+    print(f"[DEBUG process_cookie_platform_price] text='{message.text}', user_id={message.from_user.id}, platform='{platform_name}'")
     try:
         price = int(message.text.strip())
     except ValueError:
@@ -84,6 +90,7 @@ def process_cookie_platform_price(message, bot, platform_name):
     send_admin_menu(bot, message)
 
 def handle_platform_remove(bot, call):
+    print(f"[DEBUG handle_platform_remove] data='{call.data}', user_id={call.from_user.id}")
     bot.answer_callback_query(call.id, text="Removing platform...")
     from db import get_platforms
     platforms = get_platforms()
@@ -105,6 +112,7 @@ def handle_platform_remove(bot, call):
     )
 
 def handle_platform_rm(bot, call, platform_name):
+    print(f"[DEBUG handle_platform_rm] data='{call.data}', user_id={call.from_user.id}, platform='{platform_name}'")
     bot.answer_callback_query(call.id, text=f"Removing {platform_name}...")
     from db import remove_platform
     response = remove_platform(platform_name)
@@ -112,6 +120,7 @@ def handle_platform_rm(bot, call, platform_name):
     handle_platform_callback(bot, call)
 
 def handle_platform_rename(bot, call):
+    print(f"[DEBUG handle_platform_rename] data='{call.data}', user_id={call.from_user.id}")
     bot.answer_callback_query(call.id, text="Renaming platform...")
     from db import get_platforms
     platforms = get_platforms()
@@ -134,6 +143,7 @@ def handle_platform_rename(bot, call):
 
 def process_platform_rename(message, bot, old_name):
     from db import rename_platform
+    print(f"[DEBUG process_platform_rename] text='{message.text}', user_id={message.from_user.id}, old_name='{old_name}'")
     new_name = message.text.strip()
     response = rename_platform(old_name, new_name)
     bot.send_message(message.chat.id, response)
@@ -141,6 +151,7 @@ def process_platform_rename(message, bot, old_name):
     send_admin_menu(bot, message)
 
 def handle_platform_changeprice(bot, call):
+    print(f"[DEBUG handle_platform_changeprice] data='{call.data}', user_id={call.from_user.id}")
     bot.answer_callback_query(call.id, text="Changing platform price...")
     from db import get_platforms
     platforms = get_platforms()
@@ -163,6 +174,7 @@ def handle_platform_changeprice(bot, call):
 
 def process_platform_changeprice(message, bot, platform_name):
     from db import change_price
+    print(f"[DEBUG process_platform_changeprice] text='{message.text}', user_id={message.from_user.id}, platform='{platform_name}'")
     new_price = message.text.strip()
     response = change_price(platform_name, new_price)
     bot.send_message(message.chat.id, response)
@@ -174,6 +186,7 @@ def process_platform_changeprice(message, bot, platform_name):
 ################################
 
 def handle_admin_stock(bot, call):
+    print(f"[DEBUG handle_admin_stock] data='{call.data}', user_id={call.from_user.id}")
     bot.answer_callback_query(call.id, text="Loading stock management...")
     platforms = get_platforms()
     if not platforms:
@@ -197,6 +210,7 @@ def handle_admin_stock(bot, call):
     )
 
 def handle_stock_platform_choice(bot, call, platform_name):
+    print(f"[DEBUG handle_stock_platform_choice] data='{call.data}', user_id={call.from_user.id}, platform='{platform_name}'")
     bot.answer_callback_query(call.id, text="Upload .txt or .zip...")
 
     if platform_name.startswith("Cookie: "):
@@ -205,6 +219,7 @@ def handle_stock_platform_choice(bot, call, platform_name):
         handle_account_stock(bot, call, platform_name)
 
 def handle_account_stock(bot, call, platform_name):
+    print(f"[DEBUG handle_account_stock] data='{call.data}', user_id={call.from_user.id}, platform='{platform_name}'")
     msg = bot.send_message(
         call.message.chat.id,
         f"Platform: {platform_name}\n"
@@ -213,6 +228,8 @@ def handle_account_stock(bot, call, platform_name):
     bot.register_next_step_handler(msg, process_account_file_or_text, bot, platform_name)
 
 def process_account_file_or_text(message, bot, platform_name):
+    print(f"[DEBUG process_account_file_or_text] content_type='{message.content_type}', user_id={message.from_user.id}, platform='{platform_name}'")
+
     if message.content_type == 'document':
         try:
             file_id = message.document.file_id
@@ -223,7 +240,6 @@ def process_account_file_or_text(message, bot, platform_name):
             resp = add_stock_to_platform(platform_name, lines)
             bot.send_message(message.chat.id, f"{resp}\n\n{len(lines)} accounts added.")
 
-            # OPTIONAL LOG
             log_event(bot, "STOCK",
                       f"[STOCK] {len(lines)} accounts added to '{platform_name}'.",
                       user=message.from_user)
@@ -245,6 +261,7 @@ def process_account_file_or_text(message, bot, platform_name):
     send_admin_menu(bot, message)
 
 def handle_cookie_stock(bot, call, platform_name):
+    print(f"[DEBUG handle_cookie_stock] data='{call.data}', user_id={call.from_user.id}, platform='{platform_name}'")
     msg = bot.send_message(
         call.message.chat.id,
         f"Platform: {platform_name}\n"
@@ -253,6 +270,8 @@ def handle_cookie_stock(bot, call, platform_name):
     bot.register_next_step_handler(msg, process_cookie_file, bot, platform_name)
 
 def process_cookie_file(message, bot, platform_name):
+    print(f"[DEBUG process_cookie_file] content_type='{message.content_type}', user_id={message.from_user.id}, platform='{platform_name}'")
+
     if message.content_type == 'document':
         filename = message.document.file_name
         file_id = message.document.file_id
