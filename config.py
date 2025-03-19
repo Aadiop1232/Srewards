@@ -1,5 +1,5 @@
-TOKEN = "7760154469:AAGWCGWkfiA7mAWPekBRT8s2vfSeba0fRtA"
-BOT_USERNAME = "ShadowRewardsBot"
+TOKEN = "http://t.me/DiddyShadowBot"
+BOT_USERNAME = "DiddyShadowBot"
 
 REQUIRED_CHANNELS = [
     "https://t.me/shadowsquad0",
