@@ -7,9 +7,6 @@ from db import get_admins
 from handlers.logs import log_event
 
 def is_admin(user_or_id):
-    """
-    Checks if the given user (object or ID) is in OWNERS or the admins table.
-    """
     try:
         if isinstance(user_or_id, dict):
             user_id = str(user_or_id.get("telegram_id"))
@@ -20,6 +17,46 @@ def is_admin(user_or_id):
     db_admins = get_admins()
     db_admin_ids = [admin.get("user_id") for admin in db_admins]
     return user_id in config.OWNERS or user_id in db_admin_ids
+
+def lend_points(admin_id, user_id, points, custom_message=None):
+    """
+    Lets an admin lend points to a user, logs the event, and sends them a message about it.
+    """
+    from db import get_user, update_user_points
+
+    user = get_user(user_id)
+    if not user:
+        return f"User '{user_id}' not found."
+
+    new_balance = user["points"] + points
+    update_user_points(user_id, new_balance)
+
+    # Log the event
+    log_event(
+        telebot.TeleBot(config.TOKEN),
+        "LEND",
+        f"[LEND] Admin {admin_id} lent {points} points to user {user_id}."
+    )
+
+    bot_instance = telebot.TeleBot(config.TOKEN)
+    if custom_message:
+        msg = (
+            f"{custom_message}\n"
+            f"Points added: {points}\n"
+            f"New balance: {new_balance} points."
+        )
+    else:
+        msg = (
+            f"You have been lent {points} points. "
+            f"Your new balance is {new_balance} points."
+        )
+
+    try:
+        bot_instance.send_message(user_id, msg)
+    except Exception as e:
+        print(f"Error sending message to user {user_id}: {e}")
+
+    return msg
 
 def send_admin_menu(bot, update):
     """
@@ -61,17 +98,11 @@ def send_admin_menu(bot, update):
         bot.send_message(chat_id, "🛠 Admin Panel", reply_markup=markup)
 
 def admin_callback_handler(bot, call):
-    """
-    Processes all callback_data that begins with 'admin'.
-    Delegates to stock_mgmt or user_mgmt or other handlers as needed.
-    """
     data = call.data
-    # If not admin or owner, reject
     if not (str(call.from_user.id) in config.OWNERS or is_admin(call.from_user)):
         bot.answer_callback_query(call.id, "Access prohibited.")
         return
 
-    # Lazy import to avoid circular references
     from handlers.stock_mgmt import (
         handle_platform_callback, handle_platform_add, handle_platform_add_cookie,
         handle_platform_remove, handle_platform_rm, handle_platform_rename,
@@ -85,7 +116,6 @@ def admin_callback_handler(bot, call):
     )
 
     if data == "admin_platform":
-        # Go to platform mgmt
         bot.answer_callback_query(call.id, "Loading platform management...")
         handle_platform_callback(bot, call)
 
@@ -121,10 +151,8 @@ def admin_callback_handler(bot, call):
         handle_stock_platform_choice(bot, call, plat_name)
 
     elif data == "admin_channel":
-        # Not implemented, just respond
         bot.answer_callback_query(call.id, "Channel management is not implemented yet.")
 
-    # Admin Management
     elif data.startswith("admin_manage"):
         handle_admin_manage(bot, call)
     elif data.startswith("admin_list"):
@@ -136,26 +164,21 @@ def admin_callback_handler(bot, call):
     elif data == "admin_add":
         handle_admin_add(bot, call)
 
-    # User Management
     elif data == "admin_users":
         handle_user_management(bot, call)
     elif data.startswith("admin_user_") and data.count("_") == 2:
         user_id = data.split("_")[2]
         handle_user_management_detail(bot, call, user_id)
     elif data.startswith("admin_user_") and data.count("_") == 3:
-        # e.g. "admin_user_123456_ban"
         _, _, user_id, action = data.split("_", 3)
         handle_user_ban_action(bot, call, user_id, action)
 
     elif data == "back_main":
-        # Return to admin menu
         from handlers.main_menu import send_main_menu
         send_admin_menu(bot, call.message)
 
     elif data == "back_admin":
-        # Also show the admin menu again
         send_admin_menu(bot, call.message)
 
     else:
-        # Fallback
         bot.answer_callback_query(call.id, "Unknown admin command.")
