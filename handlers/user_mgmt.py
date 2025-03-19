@@ -12,10 +12,7 @@ from handlers.admin import is_admin
 ####################################
 
 def handle_admin_manage(bot, call):
-    """
-    Called when user taps "Admin Mgmt".
-    Shows the admin management menu (list, ban/unban, remove, add).
-    """
+    print(f"[DEBUG handle_admin_manage] data='{call.data}', user_id={call.from_user.id}")
     bot.answer_callback_query(call.id, "Admin management loading...")
 
     markup = types.InlineKeyboardMarkup(row_width=2)
@@ -37,9 +34,7 @@ def handle_admin_manage(bot, call):
     )
 
 def handle_admin_list(bot, call):
-    """
-    Displays a list of all admins.
-    """
+    print(f"[DEBUG handle_admin_list] data='{call.data}', user_id={call.from_user.id}")
     bot.answer_callback_query(call.id, "Listing admins...")
     from db import get_admins
 
@@ -59,15 +54,14 @@ def handle_admin_list(bot, call):
     )
 
 def handle_admin_ban_unban(bot, call):
-    """
-    Initiates the ban/unban flow for an admin by asking for the admin's user ID.
-    """
+    print(f"[DEBUG handle_admin_ban_unban] data='{call.data}', user_id={call.from_user.id}")
     bot.answer_callback_query(call.id, "Ban/unban admin...")
     msg = bot.send_message(call.message.chat.id, "Please send the admin UserID to ban/unban:")
     bot.register_next_step_handler(msg, process_admin_ban_unban, bot)
 
 def process_admin_ban_unban(message, bot):
     user_id = message.text.strip()
+    print(f"[DEBUG process_admin_ban_unban] text='{message.text}', from_user_id={message.from_user.id}")
     conn = get_connection()
     conn.row_factory = None
     c = conn.cursor()
@@ -93,9 +87,6 @@ def process_admin_ban_unban(message, bot):
     send_admin_menu(bot, message)
 
 def ban_admin(user_id):
-    """
-    Sets banned=1 for this user in the admins table.
-    """
     conn = get_connection()
     c = conn.cursor()
     c.execute("UPDATE admins SET banned = 1 WHERE user_id = ?", (user_id,))
@@ -104,9 +95,6 @@ def ban_admin(user_id):
     conn.close()
 
 def unban_admin(user_id):
-    """
-    Sets banned=0 for this user in the admins table.
-    """
     conn = get_connection()
     c = conn.cursor()
     c.execute("UPDATE admins SET banned = 0 WHERE user_id = ?", (user_id,))
@@ -115,15 +103,14 @@ def unban_admin(user_id):
     conn.close()
 
 def handle_admin_remove(bot, call):
-    """
-    Asks for which admin ID to remove entirely from the admins table.
-    """
+    print(f"[DEBUG handle_admin_remove] data='{call.data}', user_id={call.from_user.id}")
     bot.answer_callback_query(call.id, "Removing admin...")
     msg = bot.send_message(call.message.chat.id, "Please send the admin UserID to remove:")
     bot.register_next_step_handler(msg, process_admin_remove, bot)
 
 def process_admin_remove(message, bot):
     user_id = message.text.strip()
+    print(f"[DEBUG process_admin_remove] text='{message.text}', from_user_id={message.from_user.id}")
     remove_admin(user_id)
     response = f"Admin {user_id} removed."
     bot.send_message(message.chat.id, response)
@@ -132,9 +119,6 @@ def process_admin_remove(message, bot):
     send_admin_menu(bot, message)
 
 def remove_admin(user_id):
-    """
-    Deletes from admins table where user_id matches.
-    """
     conn = get_connection()
     c = conn.cursor()
     c.execute("DELETE FROM admins WHERE user_id = ?", (user_id,))
@@ -145,9 +129,7 @@ def remove_admin(user_id):
     log_event(telebot.TeleBot(config.TOKEN), "ADMIN", f"[ADMIN] Removed admin {user_id}.")
 
 def handle_admin_add(bot, call):
-    """
-    Asks for a new admin's user ID & username, then adds them to the admins table.
-    """
+    print(f"[DEBUG handle_admin_add] data='{call.data}', user_id={call.from_user.id}")
     bot.answer_callback_query(call.id, "Adding new admin...")
     msg = bot.send_message(
         call.message.chat.id,
@@ -156,6 +138,7 @@ def handle_admin_add(bot, call):
     bot.register_next_step_handler(msg, process_admin_add, bot)
 
 def process_admin_add(message, bot):
+    print(f"[DEBUG process_admin_add] text='{message.text}', from_user_id={message.from_user.id}")
     if message.chat.type != "private":
         bot.send_message(message.chat.id, "Please use this command in a private chat.")
         return
@@ -173,10 +156,6 @@ def process_admin_add(message, bot):
     send_admin_menu(bot, message)
 
 def add_admin(user_id, username, role="admin"):
-    """
-    Replaces or inserts a record in the admins table with banned=0.
-    Also sends a message to that user ID to notify them.
-    """
     conn = get_connection()
     c = conn.cursor()
     c.execute("REPLACE INTO admins (user_id, username, role, banned) VALUES (?, ?, ?, 0)",
@@ -199,10 +178,7 @@ def add_admin(user_id, username, role="admin"):
 ####################################
 
 def handle_user_management(bot, call):
-    """
-    Shows a list of all users (from the 'users' table), 
-    so an admin can manage each user (ban/unban).
-    """
+    print(f"[DEBUG handle_user_management] data='{call.data}', user_id={call.from_user.id}")
     bot.answer_callback_query(call.id, "Loading user management...")
     users = get_all_users()
     if not users:
@@ -229,9 +205,7 @@ def handle_user_management(bot, call):
     )
 
 def handle_user_management_detail(bot, call, user_id):
-    """
-    Displays details for one user, with a ban/unban button.
-    """
+    print(f"[DEBUG handle_user_management_detail] data='{call.data}', user_id={call.from_user.id}, user_id_to_manage={user_id}")
     bot.answer_callback_query(call.id, "User management detail...")
     user = get_user(user_id)
     if not user:
@@ -267,9 +241,7 @@ def handle_user_management_detail(bot, call, user_id):
         bot.send_message(call.message.chat.id, text, reply_markup=markup)
 
 def handle_user_ban_action(bot, call, user_id, action):
-    """
-    Bans or unbans a normal user from the 'users' table.
-    """
+    print(f"[DEBUG handle_user_ban_action] data='{call.data}', user_id={call.from_user.id}, target_user_id={user_id}, action={action}")
     from db import ban_user, unban_user
     if action == "ban":
         ban_user(user_id)
