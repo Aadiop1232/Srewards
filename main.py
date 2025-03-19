@@ -11,7 +11,7 @@ from handlers.referral import extract_referral_code
 from handlers.rewards import send_rewards_menu, handle_platform_selection, claim_account
 from handlers.review import prompt_review, process_report, REPORT_MAPPING, handle_report_callback
 from handlers.account_info import send_account_info
-from admin import send_admin_menu, admin_callback_handler, is_admin, lend_points, generate_normal_key, generate_premium_key, add_key
+from handlers.admin import send_admin_menu, admin_callback_handler, is_admin, lend_points, generate_normal_key, generate_premium_key, add_key
 from handlers.logs import log_event
 
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
