@@ -7,6 +7,7 @@ import telebot
 from db import get_user, ban_user, unban_user, update_user_points, get_account_claim_cost, get_admins, get_connection, get_all_users
 from handlers.logs import log_event
 
+
 def is_admin(user_or_id):
     try:
         if isinstance(user_or_id, dict):
@@ -18,6 +19,41 @@ def is_admin(user_or_id):
     db_admins = get_admins()
     db_admin_ids = [admin.get("user_id") for admin in db_admins]
     return user_id in config.OWNERS or user_id in db_admin_ids
+
+# ----------------------------------------------------------------
+# The function main.py needs:
+def send_admin_menu(bot, update):
+    # This function is called in main.py to show the Admin Panel.
+    if hasattr(update, "message") and update.message:
+        chat_id = update.message.chat.id
+        user = update.message.from_user
+        message_id = update.message.message_id
+    elif hasattr(update, "from_user") and update.from_user:
+        chat_id = update.message.chat.id if hasattr(update, "message") and update.message else update.chat.id
+        user = update.from_user
+        message_id = update.message.message_id if hasattr(update, "message") and update.message else None
+    else:
+        chat_id = update.chat.id
+        user = update.from_user
+        message_id = None
+
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("📺 Platform Mgmt", callback_data="admin_platform"),
+        types.InlineKeyboardButton("📈 Stock Mgmt", callback_data="admin_stock"),
+        types.InlineKeyboardButton("🔗 Channel Mgmt", callback_data="admin_channel"),
+        types.InlineKeyboardButton("👥 Admin Mgmt", callback_data="admin_manage"),
+        types.InlineKeyboardButton("👤 User Mgmt", callback_data="admin_users"),
+        types.InlineKeyboardButton("➕ Add Admin", callback_data="admin_add")
+    )
+    markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
+    try:
+        if message_id:
+            bot.edit_message_text("🛠 Admin Panel", chat_id=chat_id, message_id=message_id, reply_markup=markup)
+        else:
+            bot.send_message(chat_id, "🛠 Admin Panel", reply_markup=markup)
+    except Exception:
+        bot.send_message(chat_id, "🛠 Admin Panel", reply_markup=markup)
 
 def add_platform(platform_name, price):
     conn = get_connection()
