@@ -17,7 +17,6 @@ from handlers.logs import log_event
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
 init_db()
 
-# /recover command: reply to a file to recover the database
 @bot.message_handler(commands=['recover'])
 def recover_command(message):
     if not message.reply_to_message or not message.reply_to_message.document:
@@ -36,7 +35,6 @@ def recover_command(message):
     except Exception as e:
         bot.reply_to(message, f"Error recovering database: {e}")
 
-# Daily backup: send bot.db to all owners every 24 hours.
 def daily_backup():
     while True:
         time.sleep(86400)  # 24 hours
@@ -50,7 +48,6 @@ def daily_backup():
 
 threading.Thread(target=daily_backup, daemon=True).start()
 
-# /broadcast command: owners can send a broadcast message to all users.
 @bot.message_handler(commands=["broadcast"])
 def broadcast_command(message):
     if str(message.from_user.id) not in config.OWNERS:
@@ -156,7 +153,7 @@ def tutorial_command(message):
         "3. Earn more points by referrals or redeeming keys.\n"
         "4. Use the Report button to report issues.\n"
         "5. Daily check-ins and missions offer bonus points.\n"
-        "Admins can generate keys with /gen, lend points with /lend, and adjust pricing with /Uprice and /Rpoints.\n"
+        "Admins can generate keys with /gen, lend points with /lend, etc.\n"
         "Enjoy and good luck! 😊"
     )
     bot.send_message(message.chat.id, text, parse_mode="HTML")
@@ -212,7 +209,9 @@ def gen_command(message):
         text = "No keys generated."
     bot.reply_to(message, text, parse_mode="HTML")
 
-# Callback query handlers
+# ----------------
+# Callback handlers
+# ----------------
 
 @bot.callback_query_handler(func=lambda call: call.data in ["claim_report", "close_report"])
 def callback_report(call):
@@ -290,7 +289,6 @@ def callback_claim(call):
     from handlers.rewards import claim_account
     claim_account(bot, call, platform_name)
 
-# Message handler for report replies (live chat)
 @bot.message_handler(func=lambda message: message.reply_to_message and 
                      message.reply_to_message.message_id in REPORT_MAPPING)
 def relay_report_reply(message):
