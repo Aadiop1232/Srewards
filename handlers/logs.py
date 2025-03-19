@@ -1,20 +1,31 @@
-import config
+# logs.py
 
-def log_event(bot, event_type, message, user=None):
+import telebot
+import config
+from db import log_admin_action
+
+def log_event(bot, action, message, user=None):
     """
-    Send a log message to the channel defined in config.LOGS_CHANNEL.
-    If a user object is provided, include both user ID and username (or first name if username is missing).
+    Logs an event both to the console and to the admin_logs table in the database.
+    Shows username + user ID if 'user' is provided.
     """
+
     if user:
-        if isinstance(user, dict):
-            user_info = f"User ID: {user.get('telegram_id')}, Username: {user.get('username')}"
-        else:
-            uname = user.username if (hasattr(user, "username") and user.username) else user.first_name
-            user_info = f"User ID: {user.id}, Username: {uname}"
-        full_message = f"[{event_type.upper()}] {user_info} - {message}"
+        # If we have a user object, include their username and user ID
+        username = user.username or user.first_name
+        user_id_str = str(user.id)
+        full_message = f"{message} [User: {username} ({user_id_str})]"
+        admin_id = user_id_str
     else:
-        full_message = f"[{event_type.upper()}] {message}"
-    try:
-        bot.send_message(config.LOGS_CHANNEL, full_message)
-    except Exception as e:
-        print(f"Error sending log event: {e}")
+        # If no user is provided, we just log the raw message
+        full_message = message
+        admin_id = "N/A"
+
+    # Print to console
+    print(f"[{action}] {full_message}")
+
+    # Save to admin_logs table via db.py
+    # 'log_admin_action' typically looks like:
+    #   def log_admin_action(admin_id, action): ...
+    # Make sure your db.py has that function, or rename as needed.
+    log_admin_action(admin_id, full_message)
