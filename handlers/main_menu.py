@@ -1,11 +1,15 @@
+# main_menu.py
+
 from telebot import types
 from db import get_user
 from handlers.admin import is_admin
 
 def send_main_menu(bot, update):
     """
-    Show the main menu with optional admin button if is_admin(user).
+    Sends the main menu with the buttons for Rewards, Info, Referral, 
+    plus Admin Panel if the user is an admin.
     """
+    # Identify user
     if hasattr(update, "from_user"):
         user = get_user(str(update.from_user.id))
         chat_id = update.chat.id if hasattr(update, "chat") else update.message.chat.id
@@ -13,6 +17,7 @@ def send_main_menu(bot, update):
         user = get_user(str(update.message.from_user.id))
         chat_id = update.message.chat.id
 
+    # Build the menu
     markup = types.InlineKeyboardMarkup(row_width=3)
     markup.add(
         types.InlineKeyboardButton("🎉 Rewards", callback_data="menu_rewards"),
@@ -24,6 +29,8 @@ def send_main_menu(bot, update):
         types.InlineKeyboardButton("📣 Report", callback_data="menu_report"),
         types.InlineKeyboardButton("💬 Support", callback_data="menu_support")
     )
+
+    # If user is an admin, show Admin Panel button
     if is_admin(user):
         markup.add(types.InlineKeyboardButton("🔨 Admin Panel", callback_data="menu_admin"))
 
