@@ -121,3 +121,6 @@ def process_cookie_file(message, bot, platform_name):
 
     from handlers.admin import send_admin_menu
     send_admin_menu(bot, message)
+
+bot.answer_callback_query(call.id, text="OK", show_alert=False)
+
