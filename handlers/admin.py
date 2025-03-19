@@ -7,6 +7,9 @@ from db import get_admins
 from handlers.logs import log_event
 
 def is_admin(user_or_id):
+    """
+    Checks if the user is in OWNERS or in the admins table.
+    """
     try:
         if isinstance(user_or_id, dict):
             user_id = str(user_or_id.get("telegram_id"))
@@ -20,7 +23,7 @@ def is_admin(user_or_id):
 
 def lend_points(admin_id, user_id, points, custom_message=None):
     """
-    Lets an admin lend points to a user, logs the event, and sends them a message about it.
+    Lets an admin lend points to a user, logs it, and notifies them.
     """
     from db import get_user, update_user_points
 
@@ -31,7 +34,7 @@ def lend_points(admin_id, user_id, points, custom_message=None):
     new_balance = user["points"] + points
     update_user_points(user_id, new_balance)
 
-    # Log the event
+    # Log event
     log_event(
         telebot.TeleBot(config.TOKEN),
         "LEND",
@@ -57,6 +60,34 @@ def lend_points(admin_id, user_id, points, custom_message=None):
         print(f"Error sending message to user {user_id}: {e}")
 
     return msg
+
+def generate_normal_key():
+    """
+    Generates a random key string like NKEY-XXXXX
+    """
+    import random, string
+    return "NKEY-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+
+def generate_premium_key():
+    """
+    Generates a random key string like PKEY-XXXXX
+    """
+    import random, string
+    return "PKEY-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+
+def add_key(key_str, key_type, points):
+    """
+    Inserts a new key record into the DB.
+    """
+    from db import get_connection
+    conn = get_connection()
+    c = conn.cursor()
+    from datetime import datetime
+    c.execute("INSERT INTO keys (\"key\", type, points, claimed, claimed_by, timestamp) VALUES (?, ?, ?, 0, NULL, ?)",
+              (key_str, key_type, points, datetime.now()))
+    conn.commit()
+    c.close()
+    conn.close()
 
 def send_admin_menu(bot, update):
     """
@@ -98,7 +129,12 @@ def send_admin_menu(bot, update):
         bot.send_message(chat_id, "🛠 Admin Panel", reply_markup=markup)
 
 def admin_callback_handler(bot, call):
+    """
+    Processes all callback_data that starts with 'admin'.
+    Forwards to stock/user mgmt or other places.
+    """
     data = call.data
+    # Check if user is actually admin/owner
     if not (str(call.from_user.id) in config.OWNERS or is_admin(call.from_user)):
         bot.answer_callback_query(call.id, "Access prohibited.")
         return
@@ -153,6 +189,7 @@ def admin_callback_handler(bot, call):
     elif data == "admin_channel":
         bot.answer_callback_query(call.id, "Channel management is not implemented yet.")
 
+    # Admin management
     elif data.startswith("admin_manage"):
         handle_admin_manage(bot, call)
     elif data.startswith("admin_list"):
@@ -164,6 +201,7 @@ def admin_callback_handler(bot, call):
     elif data == "admin_add":
         handle_admin_add(bot, call)
 
+    # User management
     elif data == "admin_users":
         handle_user_management(bot, call)
     elif data.startswith("admin_user_") and data.count("_") == 2:
