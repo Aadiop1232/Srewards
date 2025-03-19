@@ -688,12 +688,12 @@ def handle_admin_platform_add_cookie(bot, call):
     msg = bot.send_message(call.message.chat.id, "Please send the platform name to add (Cookie Platform):")
     bot.register_next_step_handler(msg, process_platform_add_cookie, bot)
 
-def process_platform_add_cookie(bot, message):
+def process_platform_add_cookie(message, bot):
     platform_name = message.text.strip()
     msg = bot.send_message(message.chat.id, f"Enter the price for cookie platform '{platform_name}':")
     bot.register_next_step_handler(msg, process_cookie_platform_price, bot, platform_name)
 
-def process_cookie_platform_price(bot, message, platform_name):
+def process_cookie_platform_price(message, bot, platform_name):
     try:
         price = int(message.text.strip())
     except ValueError:
