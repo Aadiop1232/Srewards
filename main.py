@@ -347,7 +347,7 @@ def gen_command(message):
         fancy_text += (
             "╭─━━━━━━━━━━━━─╮\n"
             "  🤖 Redeem your code:\n"
-            "   ➥ /redeem <KEY>\n"
+            "   ➥ /redeem KEY\n"
             "╰─━━━━━━━━━━━━─╯"
         )
         bot.reply_to(message, fancy_text, parse_mode="HTML")
