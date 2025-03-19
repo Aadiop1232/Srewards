@@ -3,7 +3,6 @@ BOT_USERNAME = "DiddyShadowBot"
 
 REQUIRED_CHANNELS = [
     "https://t.me/shadowsquad0",
-    "https://t.me/Binhub_Originlabs",
     "https://t.me/ShadowSquadReward"
 ]
 
