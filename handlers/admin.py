@@ -111,6 +111,9 @@ def send_admin_menu(bot, update):
         bot.send_message(chat_id, "🛠 Admin Panel", reply_markup=markup)
 
 def admin_callback_handler(bot, call):
+    # DEBUG print to confirm we got the callback
+    print(f"[DEBUG admin_callback_handler] data='{call.data}' from_user_id={call.from_user.id}")
+
     data = call.data
     if not (str(call.from_user.id) in config.OWNERS or is_admin(call.from_user)):
         bot.answer_callback_query(call.id, "Access prohibited.")
@@ -241,4 +244,4 @@ def admin_callback_handler(bot, call):
         send_admin_menu(bot, call.message)
 
     else:
-        bot.answer_callback_query(call.id, "Unknown admin command.")
+        bot.answer_callback_query(call.id, f"Unknown admin command: {data}")
