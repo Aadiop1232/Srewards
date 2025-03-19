@@ -1,5 +1,3 @@
-# stock_mgmt.py
-
 import os
 import tempfile
 import zipfile
@@ -12,7 +10,7 @@ from db import get_account_claim_cost
 from handlers.logs import log_event
 
 def handle_admin_stock(bot, call):
-    # Immediately answer the callback so the spinner stops
+    # Immediately answer the callback so spinner stops
     bot.answer_callback_query(call.id, text="Loading stock management...")
 
     platforms = get_platforms()
@@ -38,17 +36,15 @@ def handle_admin_stock(bot, call):
     )
 
 def handle_stock_platform_choice(bot, call, platform_name):
-    # Immediately answer the callback so the spinner stops
-    bot.answer_callback_query(call.id, text="Preparing stock input...")
+    # Immediately answer the callback so spinner stops
+    bot.answer_callback_query(call.id, text="Please send stock file or text...")
 
-    # Distinguish normal vs "Cookie" platforms
     if platform_name.startswith("Cookie: "):
         handle_cookie_stock(bot, call, platform_name)
     else:
         handle_account_stock(bot, call, platform_name)
 
 def handle_account_stock(bot, call, platform_name):
-    # Ask the admin to either upload a .txt file or paste accounts
     msg = bot.send_message(
         call.message.chat.id,
         f"Platform: {platform_name}\n"
@@ -80,7 +76,6 @@ def process_account_file_or_text(message, bot, platform_name):
     send_admin_menu(bot, message)
 
 def handle_cookie_stock(bot, call, platform_name):
-    # Ask the admin to upload either a .txt for single cookie or a .zip containing multiple .txt files
     msg = bot.send_message(
         call.message.chat.id,
         f"Platform: {platform_name}\n"
@@ -121,12 +116,11 @@ def process_cookie_file(message, bot, platform_name):
                 bot.send_message(message.chat.id, f"Error handling zip: {e}")
 
         elif filename.lower().endswith(".txt"):
-            # Single cookie file = 1 cookie
             raw_text = downloaded_file.decode('utf-8', errors='ignore').strip()
             resp = add_stock_to_platform(platform_name, [raw_text])
             bot.send_message(message.chat.id, f"{resp}\n\nAdded 1 cookie from .txt.")
         else:
-            bot.send_message(message.chat.id, "Please send a .txt or .zip file.")
+            bot.send_message(message.chat.id, "Unsupported file type. Please send .txt or .zip.")
     else:
         bot.send_message(message.chat.id, "Please send a .txt or .zip file for cookies.")
 
