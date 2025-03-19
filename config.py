@@ -1,4 +1,4 @@
-TOKEN = "http://t.me/DiddyShadowBot"
+TOKEN = "7938646175:AAGwcqNOAYOgq3p5XLe1jw7o9AMq9WGX52A"
 BOT_USERNAME = "DiddyShadowBot"
 
 REQUIRED_CHANNELS = [
