@@ -1,7 +1,7 @@
 import telebot
 import config
 from db import add_review
-from logs import log_event
+from handlers.logs import log_event
 
 REPORT_MAPPING = {}
 CLAIMED_REPORTS = {}
