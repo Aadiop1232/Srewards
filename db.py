@@ -329,7 +329,17 @@ def update_stock_for_platform(platform_name, stock):
     conn.commit()
     c.close()
     conn.close()
-    log_event(telebot.TeleBot(config.TOKEN), "stock", f"Platform '{platform_name}' stock updated to {len(stock)} accounts.")
+    log_event(telebot.TeleBot(config.TOKEN), "STOCK", f"[STOCK] Platform '{platform_name}' stock updated to {len(stock)} items.")
+
+def get_all_users():
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM users")
+    rows = c.fetchall()
+    c.close()
+    conn.close()
+    return [dict(r) for r in rows]
 
 if __name__ == '__main__':
     init_db()
