@@ -111,7 +111,7 @@ def send_admin_menu(bot, update):
         bot.send_message(chat_id, "🛠 Admin Panel", reply_markup=markup)
 
 def admin_callback_handler(bot, call):
-    # DEBUG print to confirm we got the callback
+    # debug
     print(f"[DEBUG admin_callback_handler] data='{call.data}' from_user_id={call.from_user.id}")
 
     data = call.data
@@ -131,67 +131,73 @@ def admin_callback_handler(bot, call):
         handle_user_management_detail, handle_user_ban_action
     )
 
+    # Accept old or new callback_data by using "in (...)"
+    # For example, "admin_platform_add" or "platform_add" will call handle_platform_add
+    # This solves the mismatch problem if old messages in chat still have "admin_platform_add"
+
     # ---- PLATFORM MGMT ----
 
-    if data == "admin_platform":
+    if data in ["admin_platform", "platform_menu"]:
         bot.answer_callback_query(call.id, "Loading platform management...")
         handle_platform_callback(bot, call)
 
-    elif data == "platform_add":
+    elif data in ["admin_platform_add", "platform_add"]:
         bot.answer_callback_query(call.id, "Adding platform...")
         handle_platform_add(bot, call)
 
-    elif data == "platform_add_cookie":
+    elif data in ["admin_platform_add_cookie", "platform_add_cookie"]:
         bot.answer_callback_query(call.id, "Adding cookie platform...")
         handle_platform_add_cookie(bot, call)
 
-    elif data == "platform_remove":
+    elif data in ["admin_platform_remove", "platform_remove"]:
         bot.answer_callback_query(call.id, "Removing platform...")
         handle_platform_remove(bot, call)
 
-    elif data.startswith("platform_rm_"):
+    elif data.startswith("admin_platform_rm_") or data.startswith("platform_rm_"):
         bot.answer_callback_query(call.id, "Removing platform...")
-        plat_name = data.replace("platform_rm_", "", 1)
+        # unify
+        plat_name = data.replace("admin_platform_rm_", "").replace("platform_rm_", "")
         handle_platform_rm(bot, call, plat_name)
 
-    elif data == "platform_rename":
+    elif data in ["admin_platform_rename", "platform_rename"]:
         bot.answer_callback_query(call.id, "Renaming platform...")
         handle_platform_rename(bot, call)
 
-    elif data.startswith("platform_rename_"):
+    elif data.startswith("admin_platform_rename_") or data.startswith("platform_rename_"):
         bot.answer_callback_query(call.id, "Renaming platform...")
-        old_name = data.replace("platform_rename_", "", 1)
+        old_name = data.replace("admin_platform_rename_", "").replace("platform_rename_", "")
         msg = bot.send_message(call.message.chat.id, f"Enter new name for platform '{old_name}':")
         bot.register_next_step_handler(msg, process_platform_rename, bot, old_name)
 
-    elif data == "platform_changeprice":
+    elif data in ["admin_platform_changeprice", "platform_changeprice"]:
         bot.answer_callback_query(call.id, "Changing platform price...")
         handle_platform_changeprice(bot, call)
 
-    elif data.startswith("platform_cp_"):
+    elif data.startswith("admin_platform_cp_") or data.startswith("platform_cp_"):
         bot.answer_callback_query(call.id, "Changing platform price...")
-        plat_name = data.replace("platform_cp_", "", 1)
+        plat_name = data.replace("admin_platform_cp_", "").replace("platform_cp_", "")
         msg = bot.send_message(call.message.chat.id, f"Enter new price for platform '{plat_name}':")
         bot.register_next_step_handler(msg, process_platform_changeprice, bot, plat_name)
 
-    elif data == "platform_back":
+    elif data in ["admin_platform_back", "platform_back"]:
         bot.answer_callback_query(call.id, "Going back to platform menu...")
         handle_platform_callback(bot, call)
 
     # ---- STOCK MGMT ----
 
-    elif data == "admin_stock":
+    elif data in ["admin_stock", "stock_menu"]:
         bot.answer_callback_query(call.id, "Loading stock mgmt...")
         handle_admin_stock(bot, call)
 
-    elif data.startswith("stock_manage_"):
+    elif data.startswith("stock_manage_") or data.startswith("admin_stock_manage_"):
         bot.answer_callback_query(call.id, "Updating stock for platform...")
-        plat_name = data.replace("stock_manage_", "", 1)
+        # unify
+        plat_name = data.replace("stock_manage_", "").replace("admin_stock_manage_", "")
         handle_stock_platform_choice(bot, call, plat_name)
 
     # ---- CHANNEL MGMT (Not Implemented) ----
 
-    elif data == "admin_channel":
+    elif data in ["admin_channel"]:
         bot.answer_callback_query(call.id, "Channel management is not implemented yet.")
 
     # ---- ADMIN MGMT ----
@@ -204,21 +210,21 @@ def admin_callback_handler(bot, call):
         bot.answer_callback_query(call.id, "Listing admins...")
         handle_admin_list(bot, call)
 
-    elif data == "admin_ban_unban":
+    elif data in ["admin_ban_unban"]:
         bot.answer_callback_query(call.id, "Ban/unban admin...")
         handle_admin_ban_unban(bot, call)
 
-    elif data == "admin_remove":
+    elif data in ["admin_remove"]:
         bot.answer_callback_query(call.id, "Removing admin...")
         handle_admin_remove(bot, call)
 
-    elif data == "admin_add":
+    elif data in ["admin_add"]:
         bot.answer_callback_query(call.id, "Adding new admin...")
         handle_admin_add(bot, call)
 
     # ---- USER MGMT ----
 
-    elif data == "admin_users":
+    elif data in ["admin_users"]:
         bot.answer_callback_query(call.id, "Loading user management...")
         handle_user_management(bot, call)
 
@@ -244,4 +250,4 @@ def admin_callback_handler(bot, call):
         send_admin_menu(bot, call.message)
 
     else:
-        bot.answer_callback_query(call.id, f"Unknown admin command: {data}")
+        bot.answer_callback_query(call.id, f"Unknown admin command/data: {data}")
