@@ -11,13 +11,58 @@ from handlers.referral import extract_referral_code
 from handlers.rewards import send_rewards_menu, handle_platform_selection, claim_account
 from handlers.review import prompt_review, process_report, REPORT_MAPPING, handle_report_callback
 from handlers.account_info import send_account_info
-from handlers.admin import send_admin_menu, admin_callback_handler, is_admin, lend_points, generate_normal_key, generate_premium_key, add_key
+from admin import send_admin_menu, admin_callback_handler, is_admin, lend_points, generate_normal_key, generate_premium_key, add_key
 from handlers.logs import log_event
 
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
 init_db()
 
-@bot.message_handler(commands=['recover'])
+##################################
+# Daily backup thread, from your code
+##################################
+
+def daily_backup():
+    while True:
+        time.sleep(86400)  # 24 hours
+        try:
+            with open(DATABASE, "rb") as f:
+                backup_data = f.read()
+            for owner in config.OWNERS:
+                bot.send_document(owner, ("bot_backup.db", backup_data))
+        except Exception as e:
+            print(f"Error during daily backup: {e}")
+
+threading.Thread(target=daily_backup, daemon=True).start()
+
+##################################
+# /start command with verifying
+##################################
+
+@bot.message_handler(commands=["start"])
+def start_command(message):
+    user_id = str(message.from_user.id)
+    user = get_user(user_id)
+    pending_ref = extract_referral_code(message)
+    if not user:
+        add_user(user_id, message.from_user.username or message.from_user.first_name,
+                 datetime.now().strftime("%Y-%m-%d"), pending_referrer=pending_ref)
+        user = get_user(user_id)
+
+    # If admin, skip verification
+    if is_admin(user):
+        bot.send_message(message.chat.id, "✨ Welcome, Admin/Owner! You are automatically verified! ✨")
+        send_main_menu(bot, message)
+        return
+
+    # Else do loading screen verification
+    bot.send_message(message.chat.id, "⏳ Verifying your channel membership, please wait...")
+    send_verification_message(bot, message)
+
+##################################
+# Some other commands, from your code
+##################################
+
+@bot.message_handler(commands=["recover"])
 def recover_command(message):
     if not message.reply_to_message or not message.reply_to_message.document:
         bot.reply_to(message, "Please reply to a database file (document) with /recover command.")
@@ -35,19 +80,6 @@ def recover_command(message):
     except Exception as e:
         bot.reply_to(message, f"Error recovering database: {e}")
 
-def daily_backup():
-    while True:
-        time.sleep(86400)  # 24 hours
-        try:
-            with open(DATABASE, "rb") as f:
-                backup_data = f.read()
-            for owner in config.OWNERS:
-                bot.send_document(owner, ("bot_backup.db", backup_data))
-        except Exception as e:
-            print(f"Error during daily backup: {e}")
-
-threading.Thread(target=daily_backup, daemon=True).start()
-
 @bot.message_handler(commands=["broadcast"])
 def broadcast_command(message):
     if str(message.from_user.id) not in config.OWNERS:
@@ -60,12 +92,12 @@ def broadcast_command(message):
     broadcast_text = parts[1]
     users = get_all_users()
     sent = 0
-    for user in users:
+    for usr in users:
         try:
-            bot.send_message(user.get("telegram_id"), f"[BROADCAST]\n\n{broadcast_text}")
+            bot.send_message(usr.get("telegram_id"), f"[BROADCAST]\n\n{broadcast_text}")
             sent += 1
         except Exception as e:
-            print(f"Error broadcasting to {user.get('telegram_id')}: {e}")
+            print(f"Error broadcasting to {usr.get('telegram_id')}: {e}")
     bot.reply_to(message, f"Broadcast sent to {sent} users.")
 
 def check_if_banned(message):
@@ -74,24 +106,6 @@ def check_if_banned(message):
         bot.send_message(message.chat.id, "🚫 You are banned and cannot use this bot.")
         return True
     return False
-
-@bot.message_handler(commands=["start"])
-def start_command(message):
-    if check_if_banned(message):
-        return
-    user_id = str(message.from_user.id)
-    user = get_user(user_id)
-    pending_ref = extract_referral_code(message)
-    if not user:
-        add_user(user_id, message.from_user.username or message.from_user.first_name,
-                 datetime.now().strftime("%Y-%m-%d"), pending_referrer=pending_ref)
-        user = get_user(user_id)
-    if is_admin(user):
-        bot.send_message(message.chat.id, "✨ Welcome, Admin/Owner! You are automatically verified! ✨")
-        send_main_menu(bot, message)
-        return
-    bot.send_message(message.chat.id, "⏳ Verifying your channel membership, please wait...")
-    send_verification_message(bot, message)
 
 @bot.message_handler(commands=["lend"])
 def lend_command(message):
@@ -140,6 +154,7 @@ def report_command(message):
     if check_if_banned(message):
         return
     msg = bot.send_message(message.chat.id, "📝 Please type your report message (you may attach a photo or document):")
+    # fix the order => (bot, m)
     bot.register_next_step_handler(msg, lambda m: process_report(bot, m))
 
 @bot.message_handler(commands=["tutorial"])
@@ -153,7 +168,7 @@ def tutorial_command(message):
         "3. Earn more points by referrals or redeeming keys.\n"
         "4. Use the Report button to report issues.\n"
         "5. Daily check-ins and missions offer bonus points.\n"
-        "Admins can generate keys with /gen, lend points with /lend, etc.\n"
+        "Admins can generate keys with /gen, lend points with /lend, and adjust pricing.\n"
         "Enjoy and good luck! 😊"
     )
     bot.send_message(message.chat.id, text, parse_mode="HTML")
@@ -189,32 +204,32 @@ def gen_command(message):
     generated = []
     if key_type == "normal":
         for _ in range(qty):
-            key = generate_normal_key()
-            add_key(key, "normal", key_points)
-            generated.append(key)
+            k = generate_normal_key()
+            add_key(k, "normal", key_points)
+            generated.append(k)
     elif key_type == "premium":
         for _ in range(qty):
-            key = generate_premium_key()
-            add_key(key, "premium", key_points)
-            generated.append(key)
+            k = generate_premium_key()
+            add_key(k, "premium", key_points)
+            generated.append(k)
     else:
         bot.reply_to(message, "Key type must be either 'normal' or 'premium'.")
         return
     if generated:
         text = "Redeem Generated ✅\n"
-        for key in generated:
-            text += f"➔ <code>{key}</code>\n"
-        text += "\nYou can redeem this code using this command: /redeem KEY"
+        for k in generated:
+            text += f"➔ <code>{k}</code>\n"
+        text += "\nUse /redeem KEY to claim these codes."
     else:
         text = "No keys generated."
     bot.reply_to(message, text, parse_mode="HTML")
 
-# ----------------
-# Callback handlers
-# ----------------
+##################################################
+# Callback Query Handlers
+##################################################
 
 @bot.callback_query_handler(func=lambda call: call.data in ["claim_report", "close_report"])
-def callback_report(call):
+def callback_report_actions(call):
     from handlers.review import handle_report_callback
     handle_report_callback(bot, call)
 
@@ -233,7 +248,7 @@ def callback_back_admin(call):
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except Exception as e:
         print("Error deleting message:", e)
-    from handlers.admin import send_admin_menu
+    from admin import send_admin_menu
     send_admin_menu(bot, call.message)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("verify"))
@@ -243,6 +258,8 @@ def callback_verify(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("admin"))
 def callback_admin(call):
+    # Single admin callback
+    from admin import admin_callback_handler
     admin_callback_handler(bot, call)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("menu_"))
@@ -259,49 +276,31 @@ def callback_menu(call):
         from handlers.review import prompt_review
         prompt_review(bot, call.message)
     elif call.data == "menu_report":
-        msg = bot.send_message(call.message.chat.id, "📝 Please type your report message (you may attach a photo or document):")
+        msg = bot.send_message(call.message.chat.id, "📝 Please type your report message (attach photo/doc if needed):")
         bot.register_next_step_handler(msg, lambda m: process_report(bot, m))
     elif call.data == "menu_support":
         from handlers.support import send_support_message
         send_support_message(bot, call.message)
     elif call.data == "menu_admin":
-        from handlers.admin import send_admin_menu
+        from admin import send_admin_menu
         send_admin_menu(bot, call.message)
     else:
         bot.answer_callback_query(call.id, "Unknown menu command.")
 
-@bot.callback_query_handler(func=lambda call: call.data == "get_ref_link")
-def callback_get_ref_link(call):
-    bot.answer_callback_query(call.id, "Generating referral link...")
-    from handlers.referral import get_referral_link
-    referral_link = get_referral_link(str(call.from_user.id))
-    bot.send_message(call.message.chat.id, f"Your referral link:\n{referral_link}")
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith("reward_"))
-def callback_reward(call):
-    platform_name = call.data.split("reward_")[1]
-    from handlers.rewards import handle_platform_selection
-    handle_platform_selection(bot, call, platform_name)
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith("claim_"))
-def callback_claim(call):
-    platform_name = call.data.split("claim_")[1]
-    from handlers.rewards import claim_account
-    claim_account(bot, call, platform_name)
-
+# Relay admin replies to user who made the report
 @bot.message_handler(func=lambda message: message.reply_to_message and 
                      message.reply_to_message.message_id in REPORT_MAPPING)
 def relay_report_reply(message):
     original_chat = REPORT_MAPPING[message.reply_to_message.message_id]
     bot.send_message(original_chat, f"Reply from Admin: {message.text}")
 
+##################################
+# Start Bot Polling
+##################################
+
 while True:
     try:
         bot.polling(none_stop=True)
     except Exception as e:
         print(f"Polling error: {e}")
-        try:
-            bot.send_message(config.LOGS_CHANNEL, f"Polling error: {e}")
-        except Exception:
-            pass
         time.sleep(15)
