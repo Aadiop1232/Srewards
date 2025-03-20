@@ -1,13 +1,16 @@
-TOKEN = "7938646175:AAGwcqNOAYOgq3p5XLe1jw7o9AMq9WGX52A"
-BOT_USERNAME = "DiddyShadowBot"
+TOKEN = "7760154469:AAGSCv8-82H45cPI4SOG8D_5La1qQOIdTr8"
+BOT_USERNAME = "@ShadowRewardsBot"
 
 REQUIRED_CHANNELS = [
     "https://t.me/shadowsquad0",
-    "https://t.me/ShadowSquadReward"
+    "https://t.me/ShadowSquadReward",
+    "https://t.me/Binhub_Originlabs",
+    "https://t.me/ShadowsquadHits",
+    "https://t.me/Originlabs"
 ]
 
 
-OWNERS = ["7218606355", "5822279535"]
+OWNERS = ["7218606355", "5822279535", "5933410316", "6355646303"]
 ADMINS = ["6061298481", "1572380763"]
 
 
