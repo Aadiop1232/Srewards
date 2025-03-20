@@ -75,16 +75,22 @@ def add_key(key_str, key_type, points):
     conn.close()
 
 def send_admin_menu(bot, update):
+    """
+    Sends the admin panel.
+    If the update is an animation (from the main menu), we cannot edit the message.
+    In that case, we delete the original message and send a new one.
+    """
+    # Determine chat_id and message_id
     if hasattr(update, "message") and update.message:
         chat_id = update.message.chat.id
         message_id = update.message.message_id
-    elif hasattr(update, "from_user") and update.from_user:
-        chat_id = update.message.chat.id if hasattr(update, "message") and update.message else update.chat.id
-        message_id = update.message.message_id if hasattr(update, "message") and update.message else None
+        is_animation = hasattr(update.message, "animation")
     else:
         chat_id = update.chat.id
         message_id = None
+        is_animation = False
 
+    # Build admin panel inline keyboard
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton("📺 Platform Mgmt", callback_data="admin_platform"),
@@ -96,18 +102,27 @@ def send_admin_menu(bot, update):
     )
     markup.add(types.InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
 
-    try:
-        if message_id:
-            bot.edit_message_text(
-                "🛠 Admin Panel",
-                chat_id=chat_id,
-                message_id=message_id,
-                reply_markup=markup
-            )
-        else:
-            bot.send_message(chat_id, "🛠 Admin Panel", reply_markup=markup)
-    except Exception:
+    # If the original message is an animation, delete it and send a new text message.
+    if is_animation:
+        try:
+            bot.delete_message(chat_id, message_id)
+        except Exception as e:
+            print(f"Failed to delete animation message: {e}")
         bot.send_message(chat_id, "🛠 Admin Panel", reply_markup=markup)
+    else:
+        try:
+            if message_id:
+                bot.edit_message_text(
+                    "🛠 Admin Panel",
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    reply_markup=markup
+                )
+            else:
+                bot.send_message(chat_id, "🛠 Admin Panel", reply_markup=markup)
+        except Exception as e:
+            print(f"Editing message failed: {e}")
+            bot.send_message(chat_id, "🛠 Admin Panel", reply_markup=markup)
 
 def admin_callback_handler(bot, call):
     try:
@@ -129,7 +144,7 @@ def admin_callback_handler(bot, call):
             handle_user_management_detail, handle_user_ban_action
         )
 
-        # PLATFORM MANAGEMENT
+        # ---- PLATFORM MGMT ----
         if data in ["admin_platform", "platform_menu"]:
             bot.answer_callback_query(call.id, "Loading platform management...")
             handle_platform_callback(bot, call)
@@ -165,7 +180,7 @@ def admin_callback_handler(bot, call):
         elif data in ["admin_platform_back", "platform_back"]:
             bot.answer_callback_query(call.id, "Going back to platform menu...")
             handle_platform_callback(bot, call)
-        # STOCK MANAGEMENT
+        # ---- STOCK MGMT ----
         elif data in ["admin_stock", "stock_menu"]:
             bot.answer_callback_query(call.id, "Loading stock management...")
             handle_admin_stock(bot, call)
@@ -173,10 +188,10 @@ def admin_callback_handler(bot, call):
             bot.answer_callback_query(call.id, "Updating stock for platform...")
             plat_name = data.replace("stock_manage_", "").replace("admin_stock_manage_", "")
             handle_stock_platform_choice(bot, call, plat_name)
-        # CHANNEL MANAGEMENT (Not implemented)
+        # ---- CHANNEL MGMT (Not Implemented) ----
         elif data in ["admin_channel"]:
             bot.answer_callback_query(call.id, "Channel management is not implemented yet.")
-        # ADMIN MANAGEMENT
+        # ---- ADMIN MGMT ----
         elif data.startswith("admin_manage"):
             bot.answer_callback_query(call.id, "Admin management loading...")
             handle_admin_manage(bot, call)
@@ -192,7 +207,7 @@ def admin_callback_handler(bot, call):
         elif data in ["admin_add"]:
             bot.answer_callback_query(call.id, "Adding new admin...")
             handle_admin_add(bot, call)
-        # USER MANAGEMENT
+        # ---- USER MGMT ----
         elif data in ["admin_users"]:
             bot.answer_callback_query(call.id, "Loading user management...")
             handle_user_management(bot, call)
