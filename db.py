@@ -1,9 +1,10 @@
-import os
 import sqlite3
+import os
 from datetime import datetime
 import json
 import config
 import telebot
+from handlers.logs import log_event
 
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bot.db")
 
@@ -13,6 +14,7 @@ def get_connection():
 def init_db():
     conn = get_connection()
     c = conn.cursor()
+    # Create users table
     c.execute('''
     CREATE TABLE IF NOT EXISTS users (
         telegram_id TEXT PRIMARY KEY,
@@ -25,70 +27,89 @@ def init_db():
         verified INTEGER DEFAULT 0
     )
     ''')
+    # Create referrals table
     c.execute('''
-    CREATE TABLE IF NOT EXISTS referrals (
-        user_id TEXT,
-        referred_id TEXT,
-        PRIMARY KEY (user_id, referred_id)
-    )
+        CREATE TABLE IF NOT EXISTS referrals (
+            user_id TEXT,
+            referred_id TEXT,
+            PRIMARY KEY (user_id, referred_id)
+        )
     ''')
+    # Create platforms table with the new column in the schema.
     c.execute(f'''
         CREATE TABLE IF NOT EXISTS platforms (
             platform_name TEXT PRIMARY KEY,
             stock TEXT,
-            price INTEGER DEFAULT {config.DEFAULT_ACCOUNT_CLAIM_COST}
+            price INTEGER DEFAULT {config.DEFAULT_ACCOUNT_CLAIM_COST},
+            platform_type TEXT DEFAULT 'account'
+        )
+    ''')
+    # Create other tables...
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS reviews (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            review TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     c.execute('''
-    CREATE TABLE IF NOT EXISTS reviews (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id TEXT,
-        review TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
+        CREATE TABLE IF NOT EXISTS admin_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            admin_id TEXT,
+            action TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
     ''')
     c.execute('''
-    CREATE TABLE IF NOT EXISTS admin_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        admin_id TEXT,
-        action TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
+        CREATE TABLE IF NOT EXISTS channels (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            channel_link TEXT
+        )
     ''')
     c.execute('''
-    CREATE TABLE IF NOT EXISTS channels (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        channel_link TEXT
-    )
+        CREATE TABLE IF NOT EXISTS admins (
+            user_id TEXT PRIMARY KEY,
+            username TEXT,
+            role TEXT,
+            banned INTEGER DEFAULT 0
+        )
     ''')
     c.execute('''
-    CREATE TABLE IF NOT EXISTS admins (
-        user_id TEXT PRIMARY KEY,
-        username TEXT,
-        role TEXT,
-        banned INTEGER DEFAULT 0
-    )
+        CREATE TABLE IF NOT EXISTS keys (
+            "key" TEXT PRIMARY KEY,
+            type TEXT,
+            points INTEGER,
+            claimed INTEGER DEFAULT 0,
+            claimed_by TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
     ''')
     c.execute('''
-    CREATE TABLE IF NOT EXISTS keys (
-        "key" TEXT PRIMARY KEY,
-        type TEXT,
-        points INTEGER,
-        claimed INTEGER DEFAULT 0,
-        claimed_by TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-    ''')
-    c.execute('''
-    CREATE TABLE IF NOT EXISTS configurations (
-        config_key TEXT PRIMARY KEY,
-        config_value TEXT
-    )
+        CREATE TABLE IF NOT EXISTS configurations (
+            config_key TEXT PRIMARY KEY,
+            config_value TEXT
+        )
     ''')
     conn.commit()
     c.close()
     conn.close()
-    add_verified_column()
+    migrate_db()
+
+def migrate_db():
+    """
+    Check if the 'platforms' table has the 'platform_type' column.
+    If not, add it via an ALTER TABLE command.
+    """
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("PRAGMA table_info(platforms)")
+    columns = [col[1] for col in c.fetchall()]
+    if 'platform_type' not in columns:
+        c.execute("ALTER TABLE platforms ADD COLUMN platform_type TEXT DEFAULT 'account'")
+        conn.commit()
+    c.close()
+    conn.close()
 
 def add_verified_column():
     conn = get_connection()
@@ -101,9 +122,13 @@ def add_verified_column():
     c.close()
     conn.close()
 
-##############
-# Config
-##############
+def update_user_verified(telegram_id):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE users SET verified = 1 WHERE telegram_id = ?", (telegram_id,))
+    conn.commit()
+    c.close()
+    conn.close()
 
 def set_config_value(key, value):
     conn = get_connection()
@@ -136,18 +161,16 @@ def get_referral_bonus():
     bonus = get_config_value("referral_bonus")
     return int(bonus) if bonus is not None else config.DEFAULT_REFERRAL_BONUS
 
-##############
-# Users
-##############
-
 def add_user(telegram_id, username, join_date, pending_referrer=None):
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM users WHERE telegram_id = ?", (telegram_id,))
     user = c.fetchone()
     if not user:
-        c.execute("INSERT INTO users (telegram_id, username, join_date, pending_referrer) VALUES (?, ?, ?, ?)",
-                  (telegram_id, username, join_date, pending_referrer))
+        c.execute("""
+            INSERT INTO users (telegram_id, username, join_date, pending_referrer)
+            VALUES (?, ?, ?, ?)
+        """, (telegram_id, username, join_date, pending_referrer))
         conn.commit()
     c.close()
     conn.close()
@@ -194,9 +217,8 @@ def add_referral(referrer_id, referred_id):
     if not c.fetchone():
         c.execute("INSERT INTO referrals (user_id, referred_id) VALUES (?, ?)", (referrer_id, referred_id))
         conn.commit()
-        bonus = 10
-        c.execute("UPDATE users SET points = points + ?, referrals = referrals + 1 WHERE telegram_id = ?",
-                  (bonus, referrer_id))
+        bonus = get_referral_bonus()
+        c.execute("UPDATE users SET points = points + ?, referrals = referrals + 1 WHERE telegram_id = ?", (bonus, referrer_id))
         conn.commit()
     c.close()
     conn.close()
@@ -209,47 +231,21 @@ def clear_pending_referral(telegram_id):
     c.close()
     conn.close()
 
-def update_user_verified(telegram_id):
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("UPDATE users SET verified = 1 WHERE telegram_id = ?", (telegram_id,))
-    conn.commit()
-    c.close()
-    conn.close()
-
-##############
-# Reviews
-##############
-
 def add_review(user_id, review_text):
     conn = get_connection()
     c = conn.cursor()
-    c.execute("INSERT INTO reviews (user_id, review, timestamp) VALUES (?, ?, ?)",
-              (user_id, review_text, datetime.now()))
+    c.execute("INSERT INTO reviews (user_id, review, timestamp) VALUES (?, ?, ?)", (user_id, review_text, datetime.now()))
     conn.commit()
     c.close()
     conn.close()
-
-##############
-# Admin Logs
-##############
 
 def log_admin_action(admin_id, action):
-    """
-    Directly inserts a record into admin_logs. 
-    No log_event() call here, so no logs->db->logs cycle.
-    """
     conn = get_connection()
     c = conn.cursor()
-    c.execute("INSERT INTO admin_logs (admin_id, action, timestamp) VALUES (?, ?, ?)",
-              (admin_id, action, datetime.now()))
+    c.execute("INSERT INTO admin_logs (admin_id, action, timestamp) VALUES (?, ?, ?)", (admin_id, action, datetime.now()))
     conn.commit()
     c.close()
     conn.close()
-
-##############
-# Admins
-##############
 
 def get_admins():
     conn = get_connection()
@@ -260,10 +256,6 @@ def get_admins():
     c.close()
     conn.close()
     return [dict(a) for a in admins]
-
-##############
-# Keys
-##############
 
 def get_key(key_str):
     conn = get_connection()
@@ -293,8 +285,7 @@ def claim_key_in_db(key_str, telegram_id):
     c.execute("UPDATE keys SET claimed = 1, claimed_by = ?, timestamp = ? WHERE \"key\" = ?",
               (telegram_id, datetime.now(), key_str))
     conn.commit()
-    c.execute("UPDATE users SET points = points + ? WHERE telegram_id = ?",
-              (points_awarded, telegram_id))
+    c.execute("UPDATE users SET points = points + ? WHERE telegram_id = ?", (points_awarded, telegram_id))
     conn.commit()
     c.close()
     conn.close()
@@ -319,10 +310,6 @@ def get_keys():
     conn.close()
     return [dict(k) for k in keys]
 
-##############
-# Leaderboard
-##############
-
 def get_leaderboard(limit=10):
     conn = get_connection()
     conn.row_factory = sqlite3.Row
@@ -333,32 +320,18 @@ def get_leaderboard(limit=10):
     conn.close()
     return [dict(row) for row in leaderboard]
 
-##############
-# Admin Dashboard
-##############
-
 def get_admin_dashboard():
-    """
-    Returns (total_users, banned_users, total_points) for an admin stats view if needed.
-    """
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM users")
     total_users = c.fetchone()[0]
-
     c.execute("SELECT COUNT(*) FROM users WHERE banned = 1")
     banned_users = c.fetchone()[0]
-
     c.execute("SELECT SUM(points) FROM users")
     total_points = c.fetchone()[0] or 0
-
     c.close()
     conn.close()
     return total_users, banned_users, total_points
-
-##############
-# Platforms / Stock
-##############
 
 def get_platforms():
     conn = get_connection()
@@ -370,53 +343,33 @@ def get_platforms():
     conn.close()
     return [dict(p) for p in platforms]
 
-def add_stock_to_platform(platform_name, accounts):
-    """
-    Returns a simple message. The calling code can log it with log_event if desired.
-    """
-    conn = get_connection()
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-
-    c.execute("SELECT stock FROM platforms WHERE platform_name = ?", (platform_name,))
-    row = c.fetchone()
-    if not row:
-        c.close()
-        conn.close()
-        return f"Platform '{platform_name}' not found."
-
-    current_stock = json.loads(row["stock"]) if row["stock"] else []
-    new_stock = current_stock + accounts
-    c.execute("UPDATE platforms SET stock = ? WHERE platform_name = ?",
-              (json.dumps(new_stock), platform_name))
-    conn.commit()
-    c.close()
-    conn.close()
-
-    return f"Stock updated with {len(accounts)} items."
-
 def update_stock_for_platform(platform_name, stock):
-    """
-    Replaces the entire stock array. The calling code can log if desired.
-    """
     conn = get_connection()
     c = conn.cursor()
-    c.execute("UPDATE platforms SET stock = ? WHERE platform_name = ?",
-              (json.dumps(stock), platform_name))
+    c.execute("UPDATE platforms SET stock = ? WHERE platform_name = ?", (json.dumps(stock), platform_name))
     conn.commit()
     c.close()
     conn.close()
+    log_event(telebot.TeleBot(config.TOKEN), "stock", f"Platform '{platform_name}' stock updated to {len(stock)} items.")
 
-def get_all_users():
+def rename_platform(old_name, new_name):
     conn = get_connection()
-    conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT * FROM users")
-    rows = c.fetchall()
+    c.execute("UPDATE platforms SET platform_name = ? WHERE platform_name = ?", (new_name, old_name))
+    conn.commit()
     c.close()
     conn.close()
-    return [dict(r) for r in rows]
+    log_event(telebot.TeleBot(config.TOKEN), "platform", f"Platform renamed from '{old_name}' to '{new_name}'.")
+
+def update_platform_price(platform_name, new_price):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE platforms SET price = ? WHERE platform_name = ?", (new_price, platform_name))
+    conn.commit()
+    c.close()
+    conn.close()
+    log_event(telebot.TeleBot(config.TOKEN), "platform", f"Platform '{platform_name}' price updated to {new_price} pts.")
 
 if __name__ == '__main__':
     init_db()
-    print("Database initialized successfully.")
+    
