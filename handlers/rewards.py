@@ -62,26 +62,33 @@ def handle_platform_selection(bot, call, platform_name):
 
 def send_premium_account_info(bot, chat_id, platform_name, account_info):
     """
-    If the claimed account is a cookie account (i.e. account_info is a dict with key 'type' == 'cookie'),
-    create an in-memory text file (with header) and send it as a document.
-    Otherwise, send the account details as a text message.
+    Sends the claimed account to the user, now with a "Report" button attached.
     """
     import io
+    from telebot import types
+
+    # Check if this is a cookie account or a normal "login pass" account
     if isinstance(account_info, dict) and account_info.get("type") == "cookie":
+        # For cookie platforms, we might be sending as a .txt file or raw text, etc.
+        # This snippet is just the example if you're sending a text message:
         cookie_content = account_info.get("content", "No details found")
         header = ("━━━━━━━━━━━━━━━━━━━━━━\n"
                   "🎁 Here Is Your Cookie For: " + platform_name + "\n"
                   "━━━━━━━━━━━━━━━━━━━━━━\n\n")
         full_text = header + cookie_content
-        file_stream = io.BytesIO(full_text.encode('utf-8'))
-        file_stream.name = f"{platform_name}_cookie.txt"
-        bot.send_document(chat_id, file_stream, caption="Your cookie file has been sent.")
+        # Create an inline keyboard with a Report button
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Report", callback_data="menu_report"))
+        # Send as text, or you could send as a file
+        bot.send_message(chat_id, full_text, parse_mode="HTML", reply_markup=markup)
+
     else:
-        text = f"""🎉✨ 𝙋𝙍𝙀𝙈𝙄𝙐𝙈 𝘼𝘾𝘾𝙊𝙐𝙉𝙏 𝙐𝙉𝙇𝙊𝘾𝙆𝙀𝘿  
+        # For normal "account" platforms or if the item is a simple string
+        text = f"""🎉✨ PREMIUM ACCOUNT UNLOCKED 
 
-✨🎉📦 𝙎𝙚𝙧𝙫𝙞𝙘𝙚 : {platform_name}
+✨🎉📦 Service: {platform_name}
 
-🔑 𝙔𝙤𝙪𝙧 𝘼𝙘𝙘𝙤𝙪𝙣𝙩 :
+🔑 Your Account: 
 <code>{account_info}</code> 📌 
 
 How to login:
@@ -89,9 +96,13 @@ How to login:
 2️⃣ Open app/website
 3️⃣ Paste & login
 
-❌ Account not working? Report below to get a refund of your points!
+❌ Account not working? Tap the button below to report and get a refund!
 By @shadowsquad0"""
-        bot.send_message(chat_id, text, parse_mode="HTML")
+        # Create an inline keyboard with a Report button
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Report", callback_data="menu_report"))
+        bot.send_message(chat_id, text, parse_mode="HTML", reply_markup=markup)
+
 
 def claim_account(bot, call, platform_name):
     user_id = str(call.from_user.id)
