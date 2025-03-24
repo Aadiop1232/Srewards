@@ -1,15 +1,12 @@
 import sqlite3
 import os
-from datetime import datetime
-import json
-import config
-import telebot
-from handlers.logs import log_event
 
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bot.db")
 
 def get_connection():
-    return sqlite3.connect(DATABASE)
+    con = sqlite3.connect(DATABASE)
+    con.row_factory = sqlite3.Row
+    return con
 
 def init_db():
     conn = get_connection()
