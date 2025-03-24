@@ -2,6 +2,7 @@ import telebot
 from telebot import types
 import random
 import config
+import io
 import json
 import sqlite3
 from db import get_user, update_user_points, get_account_claim_cost, get_platforms
@@ -60,30 +61,17 @@ def handle_platform_selection(bot, call, platform_name):
     except Exception:
         bot.send_message(call.message.chat.id, text, parse_mode="HTML", reply_markup=markup)
 
-def send_premium_account_info(bot, chat_id, platform_name, account_info):
-    """
-    Sends the claimed account to the user, now with a "Report" button attached.
-    """
-    import io
-    from telebot import types
 
-    # Check if this is a cookie account or a normal "login pass" account
+def send_premium_account_info(bot, chat_id, platform_name, account_info):
     if isinstance(account_info, dict) and account_info.get("type") == "cookie":
-        # For cookie platforms, we might be sending as a .txt file or raw text, etc.
-        # This snippet is just the example if you're sending a text message:
         cookie_content = account_info.get("content", "No details found")
-        header = ("━━━━━━━━━━━━━━━━━━━━━━\n"
-                  "🎁 Here Is Your Cookie For: " + platform_name + "\n"
-                  "━━━━━━━━━━━━━━━━━━━━━━\n\n")
-        full_text = header + cookie_content
-        # Create an inline keyboard with a Report button
+        # Create an in-memory text file
+        file_stream = io.BytesIO(cookie_content.encode("utf-8"))
+        file_stream.name = f"{platform_name}.txt"
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Report", callback_data="menu_report"))
-        # Send as text, or you could send as a file
-        bot.send_message(chat_id, full_text, parse_mode="HTML", reply_markup=markup)
-
+        bot.send_document(chat_id, file_stream, caption=f"🎁 Here is your cookie for {platform_name}", reply_markup=markup)
     else:
-        # For normal "account" platforms or if the item is a simple string
         text = f"""🎉✨ PREMIUM ACCOUNT UNLOCKED 
 
 ✨🎉📦 Service: {platform_name}
@@ -98,10 +86,10 @@ How to login:
 
 ❌ Account not working? Tap the button below to report and get a refund!
 By @shadowsquad0"""
-        # Create an inline keyboard with a Report button
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Report", callback_data="menu_report"))
         bot.send_message(chat_id, text, parse_mode="HTML", reply_markup=markup)
+
 
 
 def claim_account(bot, call, platform_name):
