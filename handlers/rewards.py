@@ -22,17 +22,17 @@ def send_rewards_menu(bot, message):
         markup.add(types.InlineKeyboardButton(btn_text, callback_data=f"reward_{platform_name}"))
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="back_main"))
     try:
-        bot.edit_message_text("<b>🎯 Available Platforms 🎯</b>", 
+        bot.edit_message_text("<b>🎯 Available Platforms 🎯</b>",
                               chat_id=message.chat.id,
-                              message_id=message.message_id, 
+                              message_id=message.message_id,
                               parse_mode="HTML", reply_markup=markup)
     except Exception:
-        bot.send_message(message.chat.id, "<b>🎯 Available Platforms 🎯</b>", 
+        bot.send_message(message.chat.id, "<b>🎯 Available Platforms 🎯</b>",
                          parse_mode="HTML", reply_markup=markup)
 
 def handle_platform_selection(bot, call, platform_name):
     conn = __import__('db').get_connection()
-    conn.row_factory = sqlite3.Row
+    # Do not reset row_factory; get_connection already sets it to sqlite3.Row
     c = conn.cursor()
     c.execute("SELECT * FROM platforms WHERE platform_name = ?", (platform_name,))
     platform = c.fetchone()
@@ -54,13 +54,12 @@ def handle_platform_selection(bot, call, platform_name):
         markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="menu_rewards"))
     try:
-        bot.edit_message_text(text, 
+        bot.edit_message_text(text,
                               chat_id=call.message.chat.id,
-                              message_id=call.message.message_id, 
+                              message_id=call.message.message_id,
                               parse_mode="HTML", reply_markup=markup)
     except Exception:
         bot.send_message(call.message.chat.id, text, parse_mode="HTML", reply_markup=markup)
-
 
 def send_premium_account_info(bot, chat_id, platform_name, account_info):
     if isinstance(account_info, dict) and account_info.get("type") == "cookie":
@@ -72,18 +71,14 @@ def send_premium_account_info(bot, chat_id, platform_name, account_info):
         markup.add(types.InlineKeyboardButton("Report", callback_data="menu_report"))
         bot.send_document(chat_id, file_stream, caption=f"🎁 Here is your cookie for {platform_name}", reply_markup=markup)
     else:
-        text = f"""🎉✨ PREMIUM ACCOUNT UNLOCKED 
-
-✨🎉📦 Service: {platform_name}
-
-🔑 Your Account: 
-<code>{account_info}</code> 📌 
-
-How to login:
+        text = f"""🎉✨ PREMIUM ACCOUNT UNLOCKED ✨🎉
+📦 Service: {platform_name}
+🔑 Your Account:
+<code>{account_info}</code>
+📌 How to login:
 1️⃣ Copy the details
 2️⃣ Open app/website
 3️⃣ Paste & login
-
 ❌ Account not working? Tap the button below to report and get a refund!
 By @shadowsquad0"""
         markup = types.InlineKeyboardMarkup()
@@ -96,10 +91,9 @@ def claim_account(bot, call, platform_name):
     if user is None:
         bot.send_message(call.message.chat.id, "User not found. Please /start the bot first.")
         return
-
     # Retrieve platform details
     conn = __import__('db').get_connection()
-    conn.row_factory = None
+    # Leave the row_factory as set in get_connection
     c = conn.cursor()
     c.execute("SELECT * FROM platforms WHERE platform_name = ?", (platform_name,))
     platform = c.fetchone()
@@ -108,8 +102,7 @@ def claim_account(bot, call, platform_name):
     if not platform:
         bot.send_message(call.message.chat.id, "Platform not found.")
         return
-
-    # Convert platform to dictionary if needed (assuming a row returns a dict-like object)
+    # Convert platform to dictionary (row is sqlite3.Row)
     platform = dict(platform)
     stock = json.loads(platform["stock"] or "[]")
     price = platform["price"] or get_account_claim_cost()
@@ -124,10 +117,8 @@ def claim_account(bot, call, platform_name):
     if not stock:
         bot.send_message(call.message.chat.id, "No accounts available.")
         return
-
     index = random.randint(0, len(stock) - 1)
     account = stock[index]
-
     if isinstance(account, dict) and account.get("type") == "cookie":
         # For cookie items, do not remove from stock
         send_premium_account_info(bot, call.message.chat.id, platform_name, account)
@@ -137,7 +128,6 @@ def claim_account(bot, call, platform_name):
         send_premium_account_info(bot, call.message.chat.id, platform_name, account)
         from db import update_stock_for_platform
         update_stock_for_platform(platform_name, stock)
-
     new_points = current_points - price
     update_user_points(user_id, new_points)
     log_event(bot, "account_claim", f"User {user_id} claimed an account from {platform_name}. New balance: {new_points} pts.")
