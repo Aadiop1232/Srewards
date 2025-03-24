@@ -2,8 +2,10 @@ import sqlite3
 import os
 from datetime import datetime
 import json
+import telebot
 import config
 from handlers.logs import log_event
+
 
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bot.db")
 
