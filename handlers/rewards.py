@@ -90,16 +90,16 @@ By @shadowsquad0"""
         markup.add(types.InlineKeyboardButton("Report", callback_data="menu_report"))
         bot.send_message(chat_id, text, parse_mode="HTML", reply_markup=markup)
 
-
-
 def claim_account(bot, call, platform_name):
     user_id = str(call.from_user.id)
     user = get_user(user_id)
     if user is None:
         bot.send_message(call.message.chat.id, "User not found. Please /start the bot first.")
         return
+
+    # Retrieve platform details
     conn = __import__('db').get_connection()
-    conn.row_factory = sqlite3.Row
+    conn.row_factory = None
     c = conn.cursor()
     c.execute("SELECT * FROM platforms WHERE platform_name = ?", (platform_name,))
     platform = c.fetchone()
@@ -108,7 +108,8 @@ def claim_account(bot, call, platform_name):
     if not platform:
         bot.send_message(call.message.chat.id, "Platform not found.")
         return
-    # Convert platform row to dictionary
+
+    # Convert platform to dictionary if needed (assuming a row returns a dict-like object)
     platform = dict(platform)
     stock = json.loads(platform["stock"] or "[]")
     price = platform["price"] or get_account_claim_cost()
@@ -123,11 +124,20 @@ def claim_account(bot, call, platform_name):
     if not stock:
         bot.send_message(call.message.chat.id, "No accounts available.")
         return
+
     index = random.randint(0, len(stock) - 1)
-    account = stock.pop(index)
-    from db import update_stock_for_platform
-    update_stock_for_platform(platform_name, stock)
+    account = stock[index]
+
+    if isinstance(account, dict) and account.get("type") == "cookie":
+        # For cookie items, do not remove from stock
+        send_premium_account_info(bot, call.message.chat.id, platform_name, account)
+    else:
+        # For consumable account items, remove the claimed item from stock
+        account = stock.pop(index)
+        send_premium_account_info(bot, call.message.chat.id, platform_name, account)
+        from db import update_stock_for_platform
+        update_stock_for_platform(platform_name, stock)
+
     new_points = current_points - price
     update_user_points(user_id, new_points)
     log_event(bot, "account_claim", f"User {user_id} claimed an account from {platform_name}. New balance: {new_points} pts.")
-    send_premium_account_info(bot, call.message.chat.id, platform_name, account)
