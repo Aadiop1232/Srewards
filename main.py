@@ -87,6 +87,75 @@ def redeem_command(message):
     bot.reply_to(message, result)
     log_event(bot, "key_claim", f"User {user_id} redeemed key {key}. Result: {result}", user=message.from_user)
 
+
+@bot.message_handler(commands=["broadcast"])
+def broadcast_command(message):
+    # Only allow owners to use the broadcast command.
+    if str(message.from_user.id) not in config.OWNERS:
+        bot.reply_to(message, "🚫 You are not authorized to use this command.")
+        return
+
+    # Expecting the command in the format: /broadcast <message>
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2:
+        bot.reply_to(message, "Usage: /broadcast <message>")
+        return
+
+    broadcast_text = parts[1]
+
+    # Retrieve all user Telegram IDs from the database.
+    from db import get_connection
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT telegram_id FROM users")
+    rows = c.fetchall()
+    c.close()
+    conn.close()
+
+    count = 0
+    for row in rows:
+        try:
+            # Each row is a tuple; telegram_id is the first element.
+            bot.send_message(row[0], broadcast_text)
+            count += 1
+        except Exception as e:
+            print(f"Error sending broadcast to {row[0]}: {e}")
+
+    bot.reply_to(message, f"Broadcast sent to {count} users.")
+
+@bot.message_handler(commands=["deduct"])
+def deduct_command(message):
+    # Only allow owners to use the deduct command.
+    if str(message.from_user.id) not in config.OWNERS:
+        bot.reply_to(message, "🚫 You are not authorized to use this command.")
+        return
+
+    # Expecting the command in the format: /deduct <user_id> <points>
+    parts = message.text.split()
+    if len(parts) < 3:
+        bot.reply_to(message, "Usage: /deduct <user_id> <points>")
+        return
+
+    user_id = parts[1]
+    try:
+        points = int(parts[2])
+    except ValueError:
+        bot.reply_to(message, "Points must be a number.")
+        return
+
+    from db import get_user, update_user_points
+    user = get_user(user_id)
+    if not user:
+        bot.reply_to(message, f"User {user_id} not found.")
+        return
+
+    current_points = int(user.get("points", 0))
+    new_points = current_points - points
+
+    update_user_points(user_id, new_points)
+    bot.reply_to(message, f"Deducted {points} points from user {user_id}. New balance: {new_points} pts.")
+
+
 @bot.message_handler(commands=["report"])
 def report_command(message):
     if check_if_banned(message):
