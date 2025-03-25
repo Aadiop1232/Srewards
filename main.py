@@ -113,15 +113,18 @@ def broadcast_command(message):
     conn.close()
 
     count = 0
+    failed = 0
     for row in rows:
         try:
-            # Each row is a tuple; telegram_id is the first element.
-            bot.send_message(row[0], broadcast_text)
+            # Since our connection uses sqlite3.Row, access the column by its key.
+            user_id = row["telegram_id"]
+            bot.send_message(user_id, broadcast_text)
             count += 1
         except Exception as e:
-            print(f"Error sending broadcast to {row[0]}: {e}")
+            failed += 1
+            print(f"Error sending broadcast to {user_id}: {e}")
 
-    bot.reply_to(message, f"Broadcast sent to {count} users.")
+    bot.reply_to(message, f"Broadcast sent to {count} users; failed for {failed} users.")
 
 @bot.message_handler(commands=["deduct"])
 def deduct_command(message):
