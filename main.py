@@ -126,37 +126,24 @@ def broadcast_command(message):
 
     bot.reply_to(message, f"Broadcast sent to {count} users; failed for {failed} users.")
 
-@bot.message_handler(commands=["deduct"])
-def deduct_command(message):
-    # Only allow owners to use the deduct command.
-    if str(message.from_user.id) not in config.OWNERS:
-        bot.reply_to(message, "🚫 You are not authorized to use this command.")
-        return
 
-    # Expecting the command in the format: /deduct <user_id> <points>
-    parts = message.text.split()
-    if len(parts) < 3:
-        bot.reply_to(message, "Usage: /deduct <user_id> <points>")
-        return
-
-    user_id = parts[1]
-    try:
-        points = int(parts[2])
-    except ValueError:
-        bot.reply_to(message, "Points must be a number.")
-        return
-
-    from db import get_user, update_user_points
+def lend_points(admin_id, user_id, points, custom_message=None):
     user = get_user(user_id)
     if not user:
-        bot.reply_to(message, f"User {user_id} not found.")
-        return
+        return f"User '{user_id}' not found."
+    new_balance = user["points"] + points
+    update_user_points(user_id, new_balance)
+    log_event(telebot.TeleBot(config.TOKEN), "lend", f"Admin {admin_id} lent {points} points to user {user_id}.")
+    bot_instance = telebot.TeleBot(config.TOKEN)
+    msg = f"You have been lent {points} points. New balance: {new_balance} points."
+    if custom_message:
+        msg += "\nMessage: " + custom_message
+    try:
+        bot_instance.send_message(user_id, msg)
+    except Exception as e:
+        print(f"Error sending message to user {user_id}: {e}")
+    return f"{points} points have been added to user {user_id}. New balance: {new_balance} points."
 
-    current_points = int(user.get("points", 0))
-    new_points = current_points - points
-
-    update_user_points(user_id, new_points)
-    bot.reply_to(message, f"Deducted {points} points from user {user_id}. New balance: {new_points} pts.")
 
 
 @bot.message_handler(commands=["report"])
