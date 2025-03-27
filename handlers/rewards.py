@@ -32,7 +32,6 @@ def send_rewards_menu(bot, message):
 
 def handle_platform_selection(bot, call, platform_name):
     conn = __import__('db').get_connection()
-    # Do not reset row_factory; get_connection already sets it to sqlite3.Row
     c = conn.cursor()
     c.execute("SELECT * FROM platforms WHERE platform_name = ?", (platform_name,))
     platform = c.fetchone()
@@ -41,7 +40,6 @@ def handle_platform_selection(bot, call, platform_name):
     if not platform:
         bot.send_message(call.message.chat.id, "Platform not found.")
         return
-    # Convert the row to a dictionary
     platform = dict(platform)
     stock = json.loads(platform["stock"] or "[]")
     price = platform["price"] or get_account_claim_cost()
@@ -93,7 +91,6 @@ def claim_account(bot, call, platform_name):
         return
     # Retrieve platform details
     conn = __import__('db').get_connection()
-    # Leave the row_factory as set in get_connection
     c = conn.cursor()
     c.execute("SELECT * FROM platforms WHERE platform_name = ?", (platform_name,))
     platform = c.fetchone()
@@ -102,7 +99,7 @@ def claim_account(bot, call, platform_name):
     if not platform:
         bot.send_message(call.message.chat.id, "Platform not found.")
         return
-    # Convert platform to dictionary (row is sqlite3.Row)
+    # Convert platform to dictionary
     platform = dict(platform)
     stock = json.loads(platform["stock"] or "[]")
     price = platform["price"] or get_account_claim_cost()
@@ -117,17 +114,12 @@ def claim_account(bot, call, platform_name):
     if not stock:
         bot.send_message(call.message.chat.id, "No accounts available.")
         return
+    # Always remove the claimed account from stock regardless of type
     index = random.randint(0, len(stock) - 1)
-    account = stock[index]
-    if isinstance(account, dict) and account.get("type") == "cookie":
-        # For cookie items, do not remove from stock
-        send_premium_account_info(bot, call.message.chat.id, platform_name, account)
-    else:
-        # For consumable account items, remove the claimed item from stock
-        account = stock.pop(index)
-        send_premium_account_info(bot, call.message.chat.id, platform_name, account)
-        from db import update_stock_for_platform
-        update_stock_for_platform(platform_name, stock)
+    account = stock.pop(index)
+    send_premium_account_info(bot, call.message.chat.id, platform_name, account)
+    from db import update_stock_for_platform, update_user_points
+    update_stock_for_platform(platform_name, stock)
     new_points = current_points - price
     update_user_points(user_id, new_points)
-    log_event(bot, "account_claim", f"User {user_id} claimed an account from {platform_name}. New balance: {new_points} pts.")
+    bot.send_message(call.message.chat.id, f"Your new balance: {new_points} pts.")
