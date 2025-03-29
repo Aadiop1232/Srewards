@@ -55,22 +55,25 @@ def start_command(message):
 def lend_command(message):
     if check_if_banned(message):
         return
+    # Restrict to owners
     if str(message.from_user.id) not in config.OWNERS:
-        bot.reply_to(message, "🚫 You don't have permission to use this command.")
+        bot.reply_to(message, "🚫 You don't have permission to use this command.", reply_to_message_id=message.message_id)
         return
+
     parts = message.text.strip().split()
     if len(parts) < 3:
-        bot.reply_to(message, "Usage: /lend <user_id> <points> [custom message]", parse_mode="HTML")
+        bot.reply_to(message, "Usage: /lend <user_id> <points> [custom message]", parse_mode="HTML", reply_to_message_id=message.message_id)
         return
     user_id = parts[1]
     try:
         points = int(parts[2])
     except ValueError:
-        bot.reply_to(message, "Points must be a number.")
+        bot.reply_to(message, "Points must be a number.", reply_to_message_id=message.message_id)
         return
+
     custom_message = " ".join(parts[3:]) if len(parts) > 3 else None
     result = lend_points(str(message.from_user.id), user_id, points, custom_message)
-    bot.reply_to(message, result)
+    bot.reply_to(message, result, reply_to_message_id=message.message_id)
     log_event(bot, "lend", f"Owner {message.from_user.id} lent {points} pts to user {user_id}.", user=message.from_user)
 
 @bot.message_handler(commands=["redeem"])
