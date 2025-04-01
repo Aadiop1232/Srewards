@@ -2,7 +2,7 @@ import telebot
 import config
 import os
 from datetime import datetime
-from db import init_db, add_user, get_user, claim_key_in_db, DATABASE
+from db import init_db, add_user, get_user, claim_key_in_db, update_user_points, DATABASE
 from handlers.verification import send_verification_message, handle_verification_callback
 from handlers.main_menu import send_main_menu
 from handlers.referral import extract_referral_code, process_verified_referral, send_referral_menu, get_referral_link
