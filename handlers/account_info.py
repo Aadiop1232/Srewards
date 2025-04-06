@@ -14,32 +14,26 @@ def send_account_info(bot, update):
        send_account_info(bot, call.message)
     """
     if isinstance(update, telebot.types.CallbackQuery):
-        # CallbackQuery scenario
         chat_id = update.message.chat.id
         user_obj = update.from_user
     elif isinstance(update, telebot.types.Message):
-        # Normal message scenario
         chat_id = update.chat.id
         user_obj = update.from_user
     else:
-        # Unknown update type
         return
 
     telegram_id = str(user_obj.id)
     user = get_user(telegram_id)
     if not user:
-        # If user not found, create them (usually done at /start)
         new_username = user_obj.username or user_obj.first_name
         add_user(telegram_id, new_username, datetime.now().strftime("%Y-%m-%d"))
         user = get_user(telegram_id)
 
-    # Extract details from the DB
     username = user.get("username", "N/A")
     join_date = user.get("join_date", "N/A")
     balance = user.get("points", 0)
     referrals = user.get("referrals", 0)
 
-    # Build the fancy UI box
     text = (
         "╭━━━✦❘༻👤 ACCOUNT INFO ༺❘✦━━━╮\n"
         "┃\n"
