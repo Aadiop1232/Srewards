@@ -17,13 +17,6 @@ from db import (
 )
 from handlers.logs import log_event
 
-# IMPORTANT: If you encounter an error such as "table platforms has no column named platform_type",
-# it means your existing DB file was created before adding the new column.
-# To fix this, run a migration (for example, using the sqlite3 command-line):
-#   ALTER TABLE platforms ADD COLUMN platform_type TEXT DEFAULT 'account';
-# Or delete/reinitialize your DB if possible.
-
-# ----------------- ADMIN CHECK -----------------
 
 def is_admin(user_or_id):
     try:
