@@ -414,6 +414,21 @@ def claim_report_in_db(user_id, admin_id):
     c.close()
     conn.close()
 
+
+# In db.py
+
+def add_report(user_id, report_text):
+    """
+    Adds a new report to the database with status 'open'.
+    """
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("INSERT INTO reports (user_id, report_text, status) VALUES (?, ?, ?)", (user_id, report_text, 'open'))
+    conn.commit()
+    c.close()
+    conn.close()
+    
+
 def close_report_in_db(user_id, admin_id):
     conn = get_connection()
     c = conn.cursor()
