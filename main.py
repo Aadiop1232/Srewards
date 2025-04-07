@@ -1,6 +1,5 @@
 import telebot
 import config
-import os
 from datetime import datetime
 from db import init_db, add_user, get_user, claim_key_in_db, update_user_points, DATABASE
 from handlers.verification import send_verification_message, handle_verification_callback
@@ -90,7 +89,6 @@ def redeem_command(message):
     bot.reply_to(message, result)
     log_event(bot, "key_claim", f"User {user_id} redeemed key {key}. Result: {result}", user=message.from_user)
 
-
 @bot.message_handler(commands=["broadcast"])
 def broadcast_command(message):
     # Only allow owners to use the broadcast command.
@@ -129,32 +127,24 @@ def broadcast_command(message):
 
     bot.reply_to(message, f"Broadcast sent to {count} users; failed for {failed} users.")
 
-
-def lend_points(admin_id, user_id, points, custom_message=None):
-    user = get_user(user_id)
-    if not user:
-        return f"User '{user_id}' not found."
-    new_balance = user["points"] + points
-    update_user_points(user_id, new_balance)
-    log_event(telebot.TeleBot(config.TOKEN), "lend", f"Admin {admin_id} lent {points} points to user {user_id}.")
-    bot_instance = telebot.TeleBot(config.TOKEN)
-    msg = f"You have been lent {points} points. New balance: {new_balance} points."
-    if custom_message:
-        msg += "\nMessage: " + custom_message
-    try:
-        bot_instance.send_message(user_id, msg)
-    except Exception as e:
-        print(f"Error sending message to user {user_id}: {e}")
-    return f"{points} points have been added to user {user_id}. New balance: {new_balance} points."
-
-
-
+# Report related logic
 @bot.message_handler(commands=["report"])
 def report_command(message):
     if check_if_banned(message):
         return
     msg = bot.send_message(message.chat.id, "📝 Please type your report message (you may attach a photo or document):")
     bot.register_next_step_handler(msg, lambda m: process_report(bot, m))
+
+@bot.message_handler(commands=["support"])
+def support_command(message):
+    if check_if_banned(message):
+        return
+    text = """
+    💬 Support Center:
+    If you're facing any issues, feel free to contact the admin or submit a report. 
+    We are here to help you.
+    """
+    bot.send_message(message.chat.id, text, parse_mode="HTML")
 
 @bot.message_handler(commands=["tutorial"])
 def tutorial_command(message):
@@ -239,8 +229,6 @@ def gen_command(message):
     bot.reply_to(message, text, parse_mode="HTML")
 
 
-# ---------------- New Recovery Commands ----------------
-
 @bot.message_handler(commands=["recover"])
 def recover_command(message):
     # Only allow owners to recover the database
@@ -280,7 +268,6 @@ def callback_back_main(call):
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except Exception as e:
         print("Error deleting message:", e)
-    from handlers.main_menu import send_main_menu
     send_main_menu(bot, call.message)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("verify"))
@@ -297,30 +284,23 @@ def callback_menu(call):
     if call.data == "menu_rewards":
         send_rewards_menu(bot, call.message)
     elif call.data == "menu_info":
-        # FIX HERE: pass 'call' instead of 'call.message'
-        from handlers.account_info import send_account_info
-        send_account_info(bot, call)  
+        send_account_info(bot, call.message)
     elif call.data == "menu_referral":
-        from handlers.referral import send_referral_menu
         send_referral_menu(bot, call.message)
     elif call.data == "menu_review":
-        from handlers.review import prompt_review
         prompt_review(bot, call.message)
     elif call.data == "menu_report":
         msg = bot.send_message(call.message.chat.id, "📝 Please type your report message (you may attach a photo or document):")
         bot.register_next_step_handler(msg, lambda m: process_report(bot, m))
     elif call.data == "menu_support":
-        from handlers.support import send_support_message
-        send_support_message(bot, call.message)
+        support_command(bot, call.message)
     elif call.data == "menu_admin":
-        from handlers.admin import send_admin_menu
         send_admin_menu(bot, call.message)
     else:
         bot.answer_callback_query(call.id, "Unknown menu command.")
 
-@bot.callback_query_handler(func=lambda call: call.data == "get_ref_link")
+@bot.callback_query_handler(func=lambda call: call.data.startswith("get_ref_link"))
 def callback_get_ref_link(call):
-    from handlers.referral import get_referral_link
     referral_link = get_referral_link(str(call.from_user.id))
     bot.answer_callback_query(call.id, "Referral link generated!")
     bot.send_message(call.message.chat.id, f"Your referral link:\n{referral_link}")
@@ -328,26 +308,7 @@ def callback_get_ref_link(call):
 @bot.callback_query_handler(func=lambda call: call.data.startswith("reward_"))
 def callback_reward(call):
     platform_name = call.data.split("reward_")[1]
-    from handlers.rewards import handle_platform_selection
     handle_platform_selection(bot, call, platform_name)
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("claim_"))
-def callback_claim(call):
-    platform_name = call.data.split("claim_")[1]
-    from handlers.rewards import claim_account
-    claim_account(bot, call, platform_name)
-
-# ---------------- Polling Loop ----------------
-
-while True:
-    try:
-        bot.polling(none_stop=True)
-    except Exception as e:
-        print(f"Polling error: {e}")
-        try:
-            bot.send_message(config.LOGS_CHANNEL, f"Polling error: {e}")
-        except Exception:
-            pass
-        import time
-        time.sleep(15)
-            
+bot.polling(non_stop=True)
+    
