@@ -73,11 +73,6 @@ def claim_report(call):
     markup.add(types.InlineKeyboardButton("Reply to User", callback_data=f"reply_user_{user_id}"))
     bot.send_message(call.from_user.id, "⚖️ You can now reply to the user's report. Please type your response:", reply_markup=markup)
 
-@bot.message_handler(func=lambda message: message.reply_to and message.reply_to.text == "⚖️ Please type your response:")
-def forward_admin_reply_to_user(message):
-    user_id = message.reply_to.message.from_user.id
-    bot.forward_message(user_id, message.chat.id, message.message_id)
-    bot.send_message(user_id, "⚖️ Your report has been responded to by an admin. Please reply if needed.")
 
 @bot.message_handler(func=lambda message: message.reply_to and message.reply_to.text == "⚖️ Your report has been responded to by an admin.")
 def forward_user_reply_to_admin(message):
