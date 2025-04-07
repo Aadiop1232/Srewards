@@ -1,8 +1,9 @@
 # handlers/review.py
 import telebot
 import config
-from db import add_review
+from db import add_review, add_report, claim_report_in_db, close_report_in_db, check_if_report_claimed, get_user
 from handlers.logs import log_event
+from telebot import types
 
 def prompt_review(bot, message):
     """
@@ -29,35 +30,78 @@ def process_review(bot, message):
 
 def process_report(bot, message):
     """
-    Process a report from the user and forward it to the owners.
-    This function supports text reports as well as media (photo or document) with captions.
+    Process the report sent by a user and notify the admins.
     """
-    # Combine caption and text if available.
-    report_text = ""
-    if message.content_type in ["photo", "document"]:
-        report_text = message.caption or ""
-    if hasattr(message, "text") and message.text:
-        # If there's a caption, append the text; otherwise, use it.
-        if report_text:
-            report_text = f"{report_text}\n{message.text}"
-        else:
-            report_text = message.text
-
-    user = message.from_user
-    username = user.username if user.username else user.first_name
-    report_header = f"Report from {username} ({user.id}):\n\n"
+    report_text = message.text
+    # Create buttons for claiming or closing the report
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("Claim Report", callback_data=f"claim_report_{message.from_user.id}"),
+        types.InlineKeyboardButton("Close Report", callback_data=f"close_report_{message.from_user.id}")
+    )
 
     for owner in config.OWNERS:
         try:
-            if message.content_type == "photo":
-                # Use highest-resolution photo.
-                photo_id = message.photo[-1].file_id
-                bot.send_photo(owner, photo_id, caption=report_header + report_text, parse_mode="HTML")
-            elif message.content_type == "document":
-                bot.send_document(owner, message.document.file_id, caption=report_header + report_text, parse_mode="HTML")
-            else:
-                bot.send_message(owner, report_header + report_text, parse_mode="HTML")
+            bot.send_message(owner, f"📢 Report from {message.from_user.username or message.from_user.first_name} ({message.from_user.id}):\n\n{report_text}", reply_markup=markup, parse_mode="HTML")
         except Exception as e:
             print(f"Error sending report to owner {owner}: {e}")
     bot.send_message(message.chat.id, "✅ Your report has been submitted. Thank you!")
+    # Save the report to the database as open
+    add_report(str(message.from_user.id), report_text)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("claim_report"))
+def claim_report(call):
+    user_id = call.data.split("_")[2]  # Extract user_id from the callback data
+    report_claimed = check_if_report_claimed(user_id)  # Function to check if the report is claimed
+
+    if report_claimed:
+        bot.answer_callback_query(call.id, "🚫 This report has already been claimed.")
+        return
+
+    # Mark the report as claimed
+    claim_report_in_db(user_id, call.from_user.id)  # Store this in your database
+    bot.answer_callback_query(call.id, "✅ You have claimed this report.")
+
+    # Notify the user that their report has been claimed
+    bot.send_message(user_id, "🚨 Your report has been claimed by an admin. You can now chat with the admin.")
+
+    # Notify the admin
+    bot.send_message(call.from_user.id, "👨‍⚖️ You have claimed this report. Please respond with your message.")
+
+    # Show buttons for communication
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(types.InlineKeyboardButton("Reply to User", callback_data=f"reply_user_{user_id}"))
+    bot.send_message(call.from_user.id, "⚖️ You can now reply to the user's report. Please type your response:", reply_markup=markup)
+
+@bot.message_handler(func=lambda message: message.reply_to and message.reply_to.text == "⚖️ Please type your response:")
+def forward_admin_reply_to_user(message):
+    user_id = message.reply_to.message.from_user.id
+    bot.forward_message(user_id, message.chat.id, message.message_id)
+    bot.send_message(user_id, "⚖️ Your report has been responded to by an admin. Please reply if needed.")
+
+@bot.message_handler(func=lambda message: message.reply_to and message.reply_to.text == "⚖️ Your report has been responded to by an admin.")
+def forward_user_reply_to_admin(message):
+    admin_id = message.reply_to.message.from_user.id
+    bot.forward_message(admin_id, message.chat.id, message.message_id)
+    bot.send_message(admin_id, "⚖️ The user has replied to your message.")
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("close_report"))
+def close_report(call):
+    user_id = call.data.split("_")[2]
+    close_report_in_db(user_id, call.from_user.id)  # Update the report status in your DB to closed
+    bot.answer_callback_query(call.id, "✅ This report is now closed.")
+
+    # Notify the user
+    bot.send_message(user_id, "🚫 Your report has been closed. Hope you found a solution!")
+
+    # Notify the admin
+    bot.send_message(call.from_user.id, "⚖️ You have closed this report. No further actions can be taken.")
     
+    # Prevent further claiming
+    bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
+
+# Handler for reports in the main menu if needed
+def send_report_menu(bot, message):
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(types.InlineKeyboardButton("📝 Submit a Report", callback_data="submit_report"))
+    bot.send_message(message.chat.id, "If you want to report any issue, use the button below:", reply_markup=markup)
