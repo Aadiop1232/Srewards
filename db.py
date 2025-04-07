@@ -29,6 +29,19 @@ def init_db():
         verified INTEGER DEFAULT 0
     )
     ''')
+    # Create reports table for tracking report status (claimed, closed)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS reports (
+            report_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            report_text TEXT,
+            status TEXT DEFAULT 'open',  -- 'open', 'claimed', 'closed'
+            claimed_by TEXT,
+            closed_by TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
     # Create referrals table
     c.execute('''
         CREATE TABLE IF NOT EXISTS referrals (
@@ -96,19 +109,6 @@ def init_db():
         CREATE TABLE IF NOT EXISTS configurations (
             config_key TEXT PRIMARY KEY,
             config_value TEXT
-        )
-    ''')
-    # Create reports table for tracking report status (claimed, closed)
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS reports (
-            report_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT,
-            report_text TEXT,
-            status TEXT DEFAULT 'open',  -- 'open', 'claimed', 'closed'
-            claimed_by TEXT,
-            closed_by TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
 
@@ -364,17 +364,6 @@ def get_platforms():
     conn.close()
     return [dict(p) for p in platforms]
 
-def update_platform_price(platform_name, new_price):
-    """
-    Update the price of a platform in the database.
-    """
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("UPDATE platforms SET price = ? WHERE platform_name = ?", (new_price, platform_name))
-    conn.commit()
-    c.close()
-    conn.close()
-
 def update_stock_for_platform(platform_name, stock):
     conn = get_connection()
     c = conn.cursor()
@@ -419,4 +408,4 @@ def close_report_in_db(user_id, admin_id):
     conn.commit()
     c.close()
     conn.close()
-    
+        
