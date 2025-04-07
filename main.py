@@ -15,8 +15,9 @@ from handlers.admin import (
 )
 from handlers.logs import log_event
 
+# Initialize the bot object with your token
 bot = telebot.TeleBot(config.TOKEN, parse_mode="HTML")
-init_db()
+
 
 def check_if_banned(message):
     user = get_user(str(message.from_user.id))
@@ -134,6 +135,31 @@ def report_command(message):
         return
     msg = bot.send_message(message.chat.id, "📝 Please type your report message (you may attach a photo or document):")
     bot.register_next_step_handler(msg, lambda m: process_report(bot, m))
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("claim_report"))
+def claim_report(call):
+    user_id = call.data.split("_")[2]  # Extract user_id from the callback data
+    report_claimed = check_if_report_claimed(user_id)  # Function to check if the report is claimed
+
+    if report_claimed:
+        bot.answer_callback_query(call.id, "🚫 This report has already been claimed.")
+        return
+
+    # Mark the report as claimed
+    claim_report_in_db(user_id, call.from_user.id)  # Store this in your database
+    bot.answer_callback_query(call.id, "✅ You have claimed this report.")
+
+    # Notify the user that their report has been claimed
+    bot.send_message(user_id, "🚨 Your report has been claimed by an admin. You can now chat with the admin.")
+
+    # Notify the admin
+    bot.send_message(call.from_user.id, "👨‍⚖️ You have claimed this report. Please respond with your message.")
+
+    # Show buttons for communication
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(types.InlineKeyboardButton("Reply to User", callback_data=f"reply_user_{user_id}"))
+    bot.send_message(call.from_user.id, "⚖️ You can now reply to the user's report. Please type your response:", reply_markup=markup)
+    
 
 @bot.message_handler(commands=["support"])
 def support_command(message):
