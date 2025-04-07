@@ -6,7 +6,6 @@ import telebot
 import config
 from handlers.logs import log_event
 
-
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bot.db")
 
 def get_connection():
@@ -47,7 +46,7 @@ def init_db():
             platform_type TEXT DEFAULT 'account'
         )
     ''')
-    # Create other tables...
+    # Create reviews table
     c.execute('''
         CREATE TABLE IF NOT EXISTS reviews (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,6 +55,7 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    # Create admin logs table
     c.execute('''
         CREATE TABLE IF NOT EXISTS admin_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,12 +64,14 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    # Create channels table
     c.execute('''
         CREATE TABLE IF NOT EXISTS channels (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             channel_link TEXT
         )
     ''')
+    # Create admins table
     c.execute('''
         CREATE TABLE IF NOT EXISTS admins (
             user_id TEXT PRIMARY KEY,
@@ -78,6 +80,7 @@ def init_db():
             banned INTEGER DEFAULT 0
         )
     ''')
+    # Create keys table
     c.execute('''
         CREATE TABLE IF NOT EXISTS keys (
             "key" TEXT PRIMARY KEY,
@@ -88,12 +91,27 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    # Create configurations table
     c.execute('''
         CREATE TABLE IF NOT EXISTS configurations (
             config_key TEXT PRIMARY KEY,
             config_value TEXT
         )
     ''')
+    # Create reports table for tracking report status (claimed, closed)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS reports (
+            report_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            report_text TEXT,
+            status TEXT DEFAULT 'open',  -- 'open', 'claimed', 'closed'
+            claimed_by TEXT,
+            closed_by TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     conn.commit()
     c.close()
     conn.close()
@@ -364,15 +382,30 @@ def rename_platform(old_name, new_name):
     conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "platform", f"Platform renamed from '{old_name}' to '{new_name}'.")
 
-def update_platform_price(platform_name, new_price):
+def check_if_report_claimed(user_id):
     conn = get_connection()
     c = conn.cursor()
-    c.execute("UPDATE platforms SET price = ? WHERE platform_name = ?", (new_price, platform_name))
+    c.execute("SELECT * FROM reports WHERE user_id = ? AND status = 'claimed'", (user_id,))
+    claim = c.fetchone()
+    c.close()
+    conn.close()
+    return claim is not None
+
+def claim_report_in_db(user_id, admin_id):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE reports SET status = 'claimed', claimed_by = ?, updated_at = ? WHERE user_id = ? AND status = 'open'",
+              (admin_id, datetime.now(), user_id))
     conn.commit()
     c.close()
     conn.close()
-    log_event(telebot.TeleBot(config.TOKEN), "platform", f"Platform '{platform_name}' price updated to {new_price} pts.")
 
-if __name__ == '__main__':
-    init_db()
+def close_report_in_db(user_id, admin_id):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE reports SET status = 'closed', closed_by = ?, updated_at = ? WHERE user_id = ? AND status = 'claimed'",
+              (admin_id, datetime.now(), user_id))
+    conn.commit()
+    c.close()
+    conn.close()
     
