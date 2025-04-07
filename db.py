@@ -143,6 +143,17 @@ def add_verified_column():
     c.close()
     conn.close()
 
+# In db.py
+
+def update_platform_price(platform_name, new_price):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE platforms SET price = ? WHERE platform_name = ?", (new_price, platform_name))
+    conn.commit()
+    c.close()
+    conn.close()
+    
+
 def update_user_verified(telegram_id):
     conn = get_connection()
     c = conn.cursor()
