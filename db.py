@@ -364,6 +364,17 @@ def get_platforms():
     conn.close()
     return [dict(p) for p in platforms]
 
+def update_platform_price(platform_name, new_price):
+    """
+    Update the price of a platform in the database.
+    """
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE platforms SET price = ? WHERE platform_name = ?", (new_price, platform_name))
+    conn.commit()
+    c.close()
+    conn.close()
+
 def update_stock_for_platform(platform_name, stock):
     conn = get_connection()
     c = conn.cursor()
@@ -408,4 +419,4 @@ def close_report_in_db(user_id, admin_id):
     conn.commit()
     c.close()
     conn.close()
-
+    
