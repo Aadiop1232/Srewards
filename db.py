@@ -382,6 +382,20 @@ def rename_platform(old_name, new_name):
     conn.close()
     log_event(telebot.TeleBot(config.TOKEN), "platform", f"Platform renamed from '{old_name}' to '{new_name}'.")
 
+# In db.py
+
+def update_platform_price(platform_name, new_price):
+    """
+    Updates the price of the specified platform in the database.
+    """
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE platforms SET price = ? WHERE platform_name = ?", (new_price, platform_name))
+    conn.commit()
+    c.close()
+    conn.close()
+    
+
 def check_if_report_claimed(user_id):
     conn = get_connection()
     c = conn.cursor()
