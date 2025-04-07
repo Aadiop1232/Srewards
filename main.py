@@ -128,6 +128,34 @@ def broadcast_command(message):
 
     bot.reply_to(message, f"Broadcast sent to {count} users; failed for {failed} users.")
 
+@bot.message_handler(func=lambda message: message.reply_to and message.reply_to.text == "⚖️ Your report has been responded to by an admin.")
+def forward_user_reply_to_admin(message):
+    admin_id = message.reply_to.message.from_user.id
+    bot.forward_message(admin_id, message.chat.id, message.message_id)
+    bot.send_message(admin_id, "⚖️ The user has replied to your message.")
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("close_report"))
+def close_report(call):
+    user_id = call.data.split("_")[2]
+    close_report_in_db(user_id, call.from_user.id)  # Update the report status in your DB to closed
+    bot.answer_callback_query(call.id, "✅ This report is now closed.")
+
+    # Notify the user
+    bot.send_message(user_id, "🚫 Your report has been closed. Hope you found a solution!")
+
+    # Notify the admin
+    bot.send_message(call.from_user.id, "⚖️ You have closed this report. No further actions can be taken.")
+    
+    # Prevent further claiming
+    bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
+
+# Handler for reports in the main menu if needed
+def send_report_menu(bot, message):
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(types.InlineKeyboardButton("📝 Submit a Report", callback_data="submit_report"))
+    bot.send_message(message.chat.id, "If you want to report any issue, use the button below:", reply_markup=markup)
+    
+
 # Report related logic
 @bot.message_handler(commands=["report"])
 def report_command(message):
